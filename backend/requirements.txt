@@ -1,0 +1,36 @@
+# Web框架
+fastapi==0.115.0
+uvicorn[standard]==0.30.0
+python-multipart==0.0.9
+
+# 任务队列
+celery==5.4.0
+redis==5.0.0
+
+# 数据库
+sqlalchemy==2.0.35
+alembic==1.13.0
+aiosqlite==0.20.0
+
+# 数据验证
+pydantic==2.9.0
+pydantic-settings==2.5.0
+
+# 行情数据
+pytdx==1.72
+python-binance==1.0.19
+
+# 数据处理
+pandas==2.2.0
+numpy==1.26.0
+TA-Lib==0.4.28
+
+# HTTP客户端
+httpx==0.27.0
+
+# LLM集成
+openai==1.50.0
+
+# 工具
+python-dotenv==1.0.0
+loguru==0.7.0

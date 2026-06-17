@@ -1,0 +1,219 @@
+classDiagram
+    direction LR
+
+    class Bar {
+        +str symbol
+        +str market
+        +str timeframe
+        +datetime timestamp
+        +float open
+        +float high
+        +float low
+        +float close
+        +float volume
+    }
+
+    class MarketDataProvider {
+        <<abstract>>
+        +connect() None
+        +disconnect() None
+        +get_bars(symbol, timeframe, limit) List~Bar~
+        +subscribe(symbol, callback) None
+        +unsubscribe(symbol) None
+    }
+
+    class TdxProvider {
+        -ExtendedMarket api
+        +connect() None
+        +disconnect() None
+        +get_bars(symbol, timeframe, limit) List~Bar~
+        +subscribe(symbol, callback) None
+    }
+
+    class BinanceProvider {
+        -Client client
+        -Dict sockets
+        +connect() None
+        +disconnect() None
+        +get_bars(symbol, timeframe, limit) List~Bar~
+        +subscribe(symbol, callback) None
+        +unsubscribe(symbol) None
+    }
+
+    MarketDataProvider <|-- TdxProvider
+    MarketDataProvider <|-- BinanceProvider
+
+    class TheoryResult {
+        +str theory_name
+        +datetime timestamp
+        +Dict annotations
+        +List~SignalHint~ hints
+        +float confidence
+    }
+
+    class TheoryEngine {
+        <<abstract>>
+        +str name
+        +analyze(bars: List~Bar~) TheoryResult
+        +get_annotations(bars: List~Bar~) List~Annotation~
+    }
+
+    class TaijiEngine {
+        +analyze(bars) TheoryResult
+        -calc_dna29_windows(bars) List~int~
+        -calc_dna13_windows(bars) List~int~
+        -find_taiji_centers(bars) List~TaijiPoint~
+    }
+
+    class SpiralEngine {
+        +analyze(bars) TheoryResult
+        -calc_fibonacci_retracement(high, low) Dict~str_float~
+        -calc_fibonacci_extensions(high, low) Dict~str_float~
+    }
+
+    class ElliottWaveEngine {
+        +analyze(bars) TheoryResult
+        -detect_impulse_waves(bars) List~Wave~
+        -detect_corrective_waves(bars) List~Wave~
+        -label_waves(waves) List~LabeledWave~
+    }
+
+    TheoryEngine <|-- TaijiEngine
+    TheoryEngine <|-- SpiralEngine
+    TheoryEngine <|-- ElliottWaveEngine
+
+    class TomasBridge {
+        -Translator translator
+        -Writer writer
+        +reason(query, context) TomasResult
+        -route_by_confidence(confidence) str
+    }
+
+    class Translator {
+        -EMLStore eml_store
+        +retrieve(query) EMLResult
+        +get_confidence(query) float
+    }
+
+    class Writer {
+        -str llm_endpoint
+        +infer(query, context) WriterResult
+    }
+
+    class EMLDistiller {
+        +distill(theory_texts) EMLGraph
+        +resolve_conflicts(new_knowledge, existing) ConflictResolution
+        +export_eml(graph) Dict
+    }
+
+    TomasBridge --> Translator : uses
+    TomasBridge --> Writer : uses
+    Translator --> EMLDistiller : loads_from
+
+    class Signal {
+        +str signal_id
+        +str symbol
+        +str market
+        +str direction
+        +float price
+        +float confidence
+        +str source_engine
+        +str theory_name
+        +datetime timestamp
+        +Dict metadata
+    }
+
+    class SignalGenerator {
+        -List~TheoryEngine~ engines
+        -TomasBridge tomas
+        -SignalFusion fusion
+        +generate(bars) List~Signal~
+        -run_theories(bars) List~TheoryResult~
+        -consult_tomas(results) TomasResult
+    }
+
+    class SignalFusion {
+        +fuse(theory_results, tomas_result) List~Signal~
+        -weight_signals(signals) List~WeightedSignal~
+        -resolve_conflicts(signals) List~Signal~
+        -assign_confidence(signal) float
+    }
+
+    SignalGenerator --> TheoryEngine : runs
+    SignalGenerator --> TomasBridge : consults
+    SignalGenerator --> SignalFusion : uses
+
+    class Order {
+        +str order_id
+        +str symbol
+        +str market
+        +str side
+        +str type
+        +float price
+        +float quantity
+        +str status
+        +datetime created_at
+        +datetime updated_at
+    }
+
+    class BinanceTrader {
+        -Client client
+        +place_market_order(symbol, side, quantity) Order
+        +place_limit_order(symbol, side, quantity, price) Order
+        +cancel_order(symbol, order_id) Order
+        +get_order_status(symbol, order_id) Order
+        +get_account_balance() Dict
+    }
+
+    class OrderManager {
+        -BinanceTrader trader
+        -RiskEngine risk_engine
+        +execute_signal(signal) Order
+        +cancel_order(order_id) Order
+        +monitor_open_orders() List~Order~
+    }
+
+    OrderManager --> BinanceTrader : delegates
+    OrderManager --> RiskEngine : checks_with
+
+    class Position {
+        +str position_id
+        +str symbol
+        +str market
+        +float quantity
+        +float entry_price
+        +float current_price
+        +float stop_loss_price
+        +float take_profit_price
+        +float unrealized_pnl
+        +datetime opened_at
+    }
+
+    class RiskEngine {
+        -StopLossManager stop_loss_mgr
+        -PositionSizer position_sizer
+        +check_risk(signal) RiskCheckResult
+        +monitor_positions() List~RiskAlert~
+        +calculate_position_size(signal) float
+    }
+
+    class StopLossManager {
+        +set_stop_loss(position, stop_price, take_profit_price) None
+        +check_stop_loss(position, current_price) StopCheckResult
+        +calculate_trailing_stop(entry_price, atr) float
+    }
+
+    class PositionSizer {
+        +calculate_size(capital, risk_pct, entry_price, stop_price) float
+        +validate_position(current_total, new_position_size) bool
+    }
+
+    RiskEngine --> StopLossManager : uses
+    RiskEngine --> PositionSizer : uses
+
+    class RiskCheckResult {
+        +bool approved
+        +float position_size
+        +str reason
+        +Dict details
+    }

@@ -1,0 +1,66 @@
+sequenceDiagram
+    participant Beat as Celery Beat
+    participant MP as MarketDataProvider
+    participant TE as TheoryEngines
+    participant SG as SignalGenerator
+    participant TB as TomasBridge
+    participant SF as SignalFusion
+    participant OM as OrderManager
+    participant RE as RiskEngine
+    participant BT as BinanceTrader
+    participant WS as WebSocket Hub
+    participant FE as Frontend
+
+    Beat->>MP: 定时触发行情采集(每分钟)
+    MP->>MP: fetch_bars(symbol, timeframe)
+    MP-->>Beat: bars[] 返回
+
+    Beat->>SG: 触发信号生成(bars)
+    SG->>TE: 并行运行理论引擎
+    par 并行计算
+        TE->>TE: TaijiEngine.analyze(bars)
+    and
+        TE->>TE: SpiralEngine.analyze(bars)
+    and
+        TE->>TE: ElliottWaveEngine.analyze(bars)
+    end
+    TE-->>SG: theory_results[]
+
+    SG->>TB: consult_tomas(theory_results)
+    TB->>TB: route_by_confidence()
+    alt confidence >= 0.5
+        TB->>TB: Translator.retrieve(query)
+        Note over TB: EML精确检索, <100ms
+    else confidence < 0.5
+        TB->>TB: Writer.infer(query, context)
+        Note over TB: LLM创造性推理, 1-5s
+    end
+    TB-->>SG: tomas_result
+
+    SG->>SF: fuse(theory_results, tomas_result)
+    SF->>SF: weight_signals()
+    SF->>SF: resolve_conflicts()
+    SF->>SF: assign_confidence()
+    SF-->>SG: signals[]
+
+    SG-->>Beat: signals[] 返回
+    Beat->>WS: 广播信号到前端
+    WS->>FE: WebSocket推送
+
+    loop 每个可执行信号(direction != HOLD)
+        Beat->>OM: execute_signal(signal)
+        OM->>RE: check_risk(signal)
+        RE->>RE: PositionSizer.calculate_size()
+        RE-->>OM: RiskCheckResult{approved, position_size}
+
+        alt risk_approved == true
+            OM->>BT: place_market_order(symbol, side, quantity)
+            BT-->>OM: order_result
+            OM->>RE: set_stop_loss(position)
+            OM-->>Beat: order_created
+            Beat->>WS: 推送订单通知
+        else risk_approved == false
+            OM-->>Beat: risk_rejected(reason)
+            Beat->>WS: 推送风控拒绝通知
+        end
+    end
