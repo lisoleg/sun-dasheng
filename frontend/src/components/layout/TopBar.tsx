@@ -12,14 +12,15 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { usePreferences } from '@/store/preferencesSlice';
 
 // lucide-react 图标
-import PanelLeftClose from 'lucide-react/dist/PanelLeftClose';
-import PanelLeftOpen from 'lucide-react/dist/PanelLeftOpen';
-import Search from 'lucide-react/dist/Search';
-import Bell from 'lucide-react/dist/Bell';
-import Sun from 'lucide-react/dist/Sun';
-import Moon from 'lucide-react/dist/Moon';
-import User from 'lucide-react/dist/User';
-import SunDim from 'lucide-react/dist/SunDim';
+import {
+  PanelLeftClose,
+  PanelLeftOpen,
+  Search,
+  Bell,
+  Sun,
+  Moon,
+  User,
+} from 'lucide-react';
 
 interface TopBarProps {
   onToggleSidebar: () => void;

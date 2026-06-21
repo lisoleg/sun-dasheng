@@ -11,14 +11,16 @@ import Tooltip from '@mui/material/Tooltip';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 // lucide-react 图标
-import LayoutDashboard from 'lucide-react/dist/LayoutDashboard';
-import CandlestickChart from 'lucide-react/dist/CandlestickChart';
-import Bell from 'lucide-react/dist/Bell';
-import FlaskConical from 'lucide-react/dist/FlaskConical';
-import ShieldAlert from 'lucide-react/dist/ShieldAlert';
-import Network from 'lucide-react/dist/Network';
-import Settings from 'lucide-react/dist/Settings';
-import ChevronRight from 'lucide-react/dist/ChevronRight';
+import {
+  LayoutDashboard,
+  CandlestickChart,
+  Bell,
+  FlaskConical,
+  ShieldAlert,
+  Network,
+  Settings,
+  ChevronRight,
+} from 'lucide-react';
 
 interface SidebarProps {
   open: boolean;

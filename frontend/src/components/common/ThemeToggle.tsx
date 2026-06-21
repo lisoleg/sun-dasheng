@@ -1,8 +1,7 @@
 import React from 'react';
 import IconButton from '@mui/material/IconButton';
 import { usePreferences } from '@/store/preferencesSlice';
-import Sun from 'lucide-react/dist/Sun';
-import Moon from 'lucide-react/dist/Moon';
+import { Sun, Moon } from 'lucide-react';
 
 interface ThemeToggleProps {
   size?: 'small' | 'medium';

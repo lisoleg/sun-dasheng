@@ -1,338 +1,139 @@
-/**
- * BacktestPage - 回测中心页面
- *
- * 包含：
- * - 配置区（策略选择、时间范围、初始资金、标的）
- * - 收益曲线图（策略收益 vs 基准收益）
- * - 统计指标卡片（总收益率、最大回撤、夏普比率等）
- * - 交易明细表格
- */
+import React, { useState } from 'react';
+import Box from '@mui/material/Box';
+import Typography from '@mui/material/Typography';
+import Tabs from '@mui/material/Tabs';
+import Tab from '@mui/material/Tab';
+import type { ThemeMode } from '@/theme';
+import BacktestConfigForm from '@/components/backtest/BacktestConfigForm';
+import EquityCurveChart from '@/components/backtest/EquityCurveChart';
 
-import React, { useState } from "react";
-import {
-  Box,
-  Grid,
-  Card,
-  CardContent,
-  Typography,
-  Button,
-  Checkbox,
-  FormControlLabel,
-  TextField,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
-  LinearProgress,
-  Alert,
-} from "@mui/material";
-import PlayArrowIcon from "@mui/icons-material/PlayArrow";
-import {
-  generateMockEquityCurve,
-  generateMockTrades,
-  MOCK_BACKTEST_STATS,
-  type EquityPoint,
-  type BacktestTrade,
-  type BacktestStats,
-} from "@/utils/mockData";
-
-// ============================================================
-// 主组件
-// ============================================================
+interface BacktestPageProps {
+  themeMode?: ThemeMode;
+}
 
 /**
- * BacktestPage - 回测中心页面
+ * 回测页
+ * PRD §4.3.4：配置 + 结果可视化
+ * 
+ * 布局：
+ * - 左侧：配置面板（300px 固定）
+ * - 右侧：结果区（Tab 切换）
  */
-const BacktestPage: React.FC = () => {
+const BacktestPage: React.FC<BacktestPageProps> = ({ themeMode = 'dark' }) => {
+  const [tab, setTab] = useState(0);
   const [running, setRunning] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [stats, setStats] = useState<BacktestStats | null>(null);
-  const [equityCurve, setEquityCurve] = useState<EquityPoint[]>([]);
-  const [trades, setTrades] = useState<BacktestTrade[]>([]);
-  const [strategies, setStrategies] = useState({
-    taiji: true,
-    spiral: true,
-    elliott: true,
-    tomas: false,
-  });
+  const [hasResult, setHasResult] = useState(false);
 
-  // 运行回测
+  const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
+    setTab(newValue);
+  };
+
   const handleRunBacktest = () => {
     setRunning(true);
-    setProgress(0);
-
-    // 模拟回测进度
-    const interval = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setRunning(false);
-          setStats(MOCK_BACKTEST_STATS);
-          setEquityCurve(generateMockEquityCurve(90, 100000));
-          setTrades(generateMockTrades());
-          return 100;
-        }
-        return prev + 10;
-      });
-    }, 200);
+    // 模拟回测完成
+    setTimeout(() => {
+      setRunning(false);
+      setHasResult(true);
+    }, 3000);
   };
 
   return (
-    <Box sx={{ height: "calc(100vh - 64px)", display: "flex", flexDirection: "column", p: 2, gap: 2 }}>
-      {/* 配置区 */}
-      <Paper sx={{ p: 2 }}>
-        <Typography variant="h6" gutterBottom>
-          回测配置
-        </Typography>
-        <Grid container spacing={2} alignItems="center">
-          <Grid item xs={12} sm={6} md={3}>
-            <Typography gutterBottom>策略选择</Typography>
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={strategies.taiji}
-                  onChange={(e) => setStrategies({ ...strategies, taiji: e.target.checked })}
-                />
-              }
-              label="太极中心律"
-            />
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={strategies.spiral}
-                  onChange={(e) => setStrategies({ ...strategies, spiral: e.target.checked })}
-                />
-              }
-              label="螺旋律"
-            />
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={strategies.elliott}
-                  onChange={(e) => setStrategies({ ...strategies, elliott: e.target.checked })}
-                />
-              }
-              label="波浪理论"
-            />
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={strategies.tomas}
-                  onChange={(e) => setStrategies({ ...strategies, tomas: e.target.checked })}
-                />
-              }
-              label="TOMAS终裁"
-            />
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <TextField
-              fullWidth
-              label="开始日期"
-              type="date"
-              defaultValue="2024-01-01"
-              InputLabelProps={{ shrink: true }}
-              size="small"
-            />
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <TextField
-              fullWidth
-              label="结束日期"
-              type="date"
-              defaultValue="2024-03-31"
-              InputLabelProps={{ shrink: true }}
-              size="small"
-            />
-          </Grid>
-          <Grid item xs={12} sm={6} md={2}>
-            <TextField
-              fullWidth
-              label="初始资金"
-              defaultValue="100000"
-              size="small"
-              InputProps={{
-                startAdornment: <span>¥</span>,
-              }}
-            />
-          </Grid>
-          <Grid item xs={12} sm={6} md={1}>
-            <Button
-              fullWidth
-              variant="contained"
-              startIcon={<PlayArrowIcon />}
-              onClick={handleRunBacktest}
-              disabled={running}
-            >
-              运行
-            </Button>
-          </Grid>
-        </Grid>
-        {running && (
-          <Box sx={{ mt: 2 }}>
-            <LinearProgress variant="determinate" value={progress} />
-            <Typography variant="body2" sx={{ mt: 1 }}>
-              回测进度: {progress}%
-            </Typography>
+    <Box sx={{ display: 'flex', height: 'calc(100vh - 48px - 28px)', overflow: 'hidden' }}>
+      {/* 左侧配置面板 */}
+      <Box
+        sx={{
+          width: 320,
+          borderRight: 1,
+          borderColor: themeMode === 'dark' ? '#30363d' : '#d0d7de',
+          overflow: 'auto',
+          p: 2,
+        }}
+      >
+        <BacktestConfigForm onRun={handleRunBacktest} />
+      </Box>
+
+      {/* 右侧结果区 */}
+      <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
+        <Tabs value={tab} onChange={handleTabChange} sx={{ mb: 2 }}>
+          <Tab label="结果总览" />
+          <Tab label="交易明细" />
+          <Tab label="参数扫描" />
+          <Tab label="导出报告" />
+        </Tabs>
+
+        {tab === 0 && (
+          <Box>
+            {running && (
+              <Typography color="primary" sx={{ mb: 2 }}>
+                回测运行中...
+              </Typography>
+            )}
+            {hasResult && (
+              <Box>
+                <PerformanceMetrics themeMode={themeMode} />
+                <EquityCurveChart themeMode={themeMode} />
+              </Box>
+            )}
+            {!running && !hasResult && (
+              <Typography color="text.secondary">
+                请配置回测参数并点击"启动回测"
+              </Typography>
+            )}
           </Box>
         )}
-      </Paper>
-
-      {/* 收益曲线图（Mock） */}
-      {stats && (
-        <Paper sx={{ p: 2, flex: 1, overflow: "auto" }}>
-          <Typography variant="h6" gutterBottom>
-            收益曲线
+        {tab === 1 && (
+          <Typography color="text.secondary">
+            交易明细（Phase 2.1 实现）
           </Typography>
-          <Box
-            sx={{
-              height: 300,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              bgcolor: "#f5f5f5",
-              borderRadius: 1,
-            }}
-          >
-            <Typography color="text.secondary">
-              收益曲线图（使用 lightweight-charts 渲染）
-              <br />
-              策略收益: +23.7% | 基准收益: +12.3%
-            </Typography>
-          </Box>
-        </Paper>
-      )}
-
-      {/* 统计指标 */}
-      {stats && (
-        <Grid container spacing={2}>
-          <Grid item xs={6} sm={4} md={2}>
-            <Card>
-              <CardContent>
-                <Typography color="text.secondary" gutterBottom>
-                  总收益率
-                </Typography>
-                <Typography variant="h5" sx={{ color: stats.total_return > 0 ? "#ef5350" : "#26a69a" }}>
-                  {(stats.total_return * 100).toFixed(1)}%
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid item xs={6} sm={4} md={2}>
-            <Card>
-              <CardContent>
-                <Typography color="text.secondary" gutterBottom>
-                  最大回撤
-                </Typography>
-                <Typography variant="h5" sx={{ color: "#f44336" }}>
-                  {(stats.max_drawdown * 100).toFixed(1)}%
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid item xs={6} sm={4} md={2}>
-            <Card>
-              <CardContent>
-                <Typography color="text.secondary" gutterBottom>
-                  夏普比率
-                </Typography>
-                <Typography variant="h5">{stats.sharpe_ratio.toFixed(2)}</Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid item xs={6} sm={4} md={2}>
-            <Card>
-              <CardContent>
-                <Typography color="text.secondary" gutterBottom>
-                  胜率
-                </Typography>
-                <Typography variant="h5" sx={{ color: "#4caf50" }}>
-                  {(stats.win_rate * 100).toFixed(0)}%
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid item xs={6} sm={4} md={2}>
-            <Card>
-              <CardContent>
-                <Typography color="text.secondary" gutterBottom>
-                  盈亏比
-                </Typography>
-                <Typography variant="h5">{stats.profit_loss_ratio.toFixed(1)}</Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid item xs={6} sm={4} md={2}>
-            <Card>
-              <CardContent>
-                <Typography color="text.secondary" gutterBottom>
-                  交易次数
-                </Typography>
-                <Typography variant="h5">{stats.trade_count}</Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
-      )}
-
-      {/* 交易明细 */}
-      {trades.length > 0 && (
-        <Paper sx={{ p: 2 }}>
-          <Typography variant="h6" gutterBottom>
-            交易明细
+        )}
+        {tab === 2 && (
+          <Typography color="text.secondary">
+            参数扫描（Phase 2.1 实现）
           </Typography>
-          <TableContainer sx={{ maxHeight: 300 }}>
-            <Table size="small" stickyHeader>
-              <TableHead>
-                <TableRow>
-                  <TableCell>交易ID</TableCell>
-                  <TableCell>标的</TableCell>
-                  <TableCell>方向</TableCell>
-                  <TableCell>入场价</TableCell>
-                  <TableCell>出场价</TableCell>
-                  <TableCell>盈亏</TableCell>
-                  <TableCell>盈亏%</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {trades.map((trade) => (
-                  <TableRow key={trade.trade_id} hover>
-                    <TableCell>{trade.trade_id}</TableCell>
-                    <TableCell>{trade.symbol}</TableCell>
-                    <TableCell>
-                      <span style={{ color: trade.direction === "LONG" ? "#ef5350" : "#26a69a" }}>
-                        {trade.direction}
-                      </span>
-                    </TableCell>
-                    <TableCell>{trade.entry_price.toFixed(2)}</TableCell>
-                    <TableCell>{trade.exit_price.toFixed(2)}</TableCell>
-                    <TableCell>
-                      <span style={{ color: trade.pnl >= 0 ? "#ef5350" : "#26a69a" }}>
-                        {trade.pnl >= 0 ? "+" : ""}{trade.pnl.toFixed(2)}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <span style={{ color: trade.pnl_pct >= 0 ? "#ef5350" : "#26a69a" }}>
-                        {trade.pnl_pct >= 0 ? "+" : ""}{trade.pnl_pct.toFixed(2)}%
-                      </span>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </Paper>
-      )}
-
-      {!stats && !running && (
-        <Alert severity="info">
-          请选择策略并点击"运行"按钮开始回测
-        </Alert>
-      )}
+        )}
+        {tab === 3 && (
+          <Typography color="text.secondary">
+            导出报告（Phase 2.1 实现）
+          </Typography>
+        )}
+      </Box>
     </Box>
   );
 };
+
+// ==================== 绩效指标卡片 ===================
+function PerformanceMetrics({ themeMode }: { themeMode: ThemeMode }) {
+  const metrics = [
+    { label: '总收益率', value: '35.0%', color: '#ef4444' },
+    { label: '年化收益率', value: '18.2%', color: '#ef4444' },
+    { label: '夏普比率', value: '1.85', color: '#58a6ff' },
+    { label: '最大回撤', value: '-3.0%', color: '#22c55e' },
+    { label: '胜率', value: '58.5%', color: '#58a6ff' },
+    { label: '盈亏比', value: '1.65', color: '#58a6ff' },
+  ];
+
+  return (
+    <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 2, mb: 2 }}>
+      {metrics.map((m) => (
+        <Box
+          key={m.label}
+          sx={{
+            p: 2,
+            border: 1,
+            borderColor: themeMode === 'dark' ? '#30363d' : '#d0d7de',
+            borderRadius: 1,
+          }}
+        >
+          <Typography variant="caption" color="textSecondary">
+            {m.label}
+          </Typography>
+          <Typography variant="h6" sx={{ color: m.color, fontFamily: 'monospace' }}>
+            {m.value}
+          </Typography>
+        </Box>
+      ))}
+    </Box>
+  );
+}
 
 export default BacktestPage;
