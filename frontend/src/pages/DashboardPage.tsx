@@ -1,8 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import Box from '@mui/material/Box';
 import Grid from '@mui/material/Grid';
 import Typography from '@mui/material/Typography';
 import { usePreferences } from '@/store/preferencesSlice';
+import MarketOverviewPanel from '@/components/dashboard/MarketOverviewPanel';
+import AccountSummaryPanel from '@/components/dashboard/AccountSummaryPanel';
+import RecentSignalsPanel from '@/components/dashboard/RecentSignalsPanel';
+import PnLCurvePanel from '@/components/dashboard/PnLCurvePanel';
+import TheoryStatusPanel from '@/components/dashboard/TheoryStatusPanel';
+import SystemStatusPanel from '@/components/dashboard/SystemStatusPanel';
 
 /**
  * 仪表盘首页

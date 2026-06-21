@@ -5,7 +5,7 @@ import CardContent from '@mui/material/CardContent';
 import Box from '@mui/material/Box';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
-import MoreHorizontal from 'lucide-react/dist/MoreHorizontal';
+import { MoreHorizontal } from 'lucide-react';
 import type { ThemeMode } from '@/theme';
 
 interface PanelProps {

@@ -1,6 +1,5 @@
 import { useState, useCallback } from 'react';
 import type { Layout } from 'react-grid-layout';
-import { defaultLayout, minimalLayout, analystLayout } from '@/layouts/defaultLayout';
 
 /**
  * 布局模板保存/加载（localStorage）
@@ -34,12 +33,20 @@ export function useLayoutTemplate() {
 }
 
 function getDefaultLayout(name: string): Layout[] {
-  switch (name) {
-    case 'minimal':
-      return minimalLayout;
-    case 'analyst':
-      return analystLayout;
-    default:
-      return defaultLayout;
-  }
+  // 硬编码默认布局（避免循环依赖）
+  const defaultLayouts: Record<string, Layout[]> = {
+    default: [
+      { i: 'market-overview', x: 0, y: 0, w: 6, h: 4 },
+      { i: 'account-summary', x: 6, y: 0, w: 6, h: 3 },
+      { i: 'recent-signals', x: 6, y: 3, w: 6, h: 3 },
+    ],
+    minimal: [
+      { i: 'market-overview', x: 0, y: 0, w: 12, h: 4 },
+    ],
+    analyst: [
+      { i: 'kline-chart', x: 0, y: 0, w: 12, h: 6 },
+      { i: 'signals', x: 0, y: 6, w: 6, h: 4 },
+    ],
+  };
+  return defaultLayouts[name] || defaultLayouts['default'];
 }
