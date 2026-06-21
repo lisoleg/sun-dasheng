@@ -6,7 +6,7 @@
 
 ---
 
-## [Unreleased] — 待发布
+## [0.2.0] — 2026-06-21
 
 ### 新增
 - 回测引擎完整实现（事件驱动 + numpy 向量化绩效计算）
@@ -23,6 +23,10 @@
 - 用户偏好持久化（主题 / 布局 / 风控设置）
 - 月度收益热力图（recharts）
 - 理论贡献度饼图
+- Phase 2 技术论文（docs/PAPER-phase2.md）
+- 系统实现白皮书（docs/IMPLEMENTATION_WHITEPAPER.md）
+- MIT 许可证（LICENSE）
+- 贡献指南（CONTRIBUTING.md）
 
 ### 修改
 - 前端整体 UI 从 MVP 升级为专业交易终端风格
@@ -30,11 +34,21 @@
 - 市场数据 / 信号 / 订单 / 风控 API 端点连接真实服务（移除 Mock）
 - 回测页面从占位升级为完整功能页面
 - 知识图谱组件增强（D3.js 力导向图 + DNA 日历 + 搜索高亮）
+- README 更新至 v0.2.0，新增回测引擎和信号融合章节
 
 ### 修复
 - 修复 WebSocket Hub `broadcast()` 异常导致的断连问题
 - 修复后端 API 端点（market.py / signal.py / order.py / risk.py）返回 Mock 数据的问题
 - 修复前端路由配置不完整的问题
+- 修复前端类型错误（DashboardPage 导入 + Panel lucide-react 导入 + useLayoutTemplate 导入）
+
+### 已知问题
+- K线图 lightweight-charts 集成需进一步完善
+- 信号详情对话框（SignalDetailDialog）未实现
+- 回测交易明细表格未实现
+- 参数扫描 UI 未实现
+- 回测引擎 `_run_backtest_task` 为 Mock，需连接真实历史数据
+- A股自动下单功能为 Mock，需合规路径
 
 ---
 

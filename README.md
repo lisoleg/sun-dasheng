@@ -516,10 +516,17 @@ sun-dasheng/
 │   ├── PRD-phase2.md           # Phase 2 增量产品需求文档
 │   ├── ARCHITECTURE.md        # Phase 1 系统架构设计
 │   ├── ARCHITECTURE-phase2.md  # Phase 2 系统架构设计
-│   ├── TEST_REPORT.md          # Phase 1 测试报告
-│   ├── USER_GUIDE.md           # 用户使用手册
-│   └── PAPER.md               # 学术论文（鲁兆理论 + TOMAS-AGI）
-├── exports/                     # 回测报告导出目录（Phase 2 新增）
+│   ├── API_DOCUMENTATION.md    # REST API + WebSocket 接口文档
+│   ├── USER_GUIDE.md           # Phase 1 用户使用手册
+│   ├── USER_GUIDE-phase2.md    # Phase 2 用户使用手册
+│   ├── DEPLOYMENT.md           # 部署指南
+│   ├── DEVELOPMENT.md          # 开发指南
+│   ├── TEST_REPORT.md          # 测试报告
+│   ├── PAPER.md               # Phase 1 学术论文（鲁兆理论 + TOMAS-AGI）
+│   ├── PAPER-phase2.md         # Phase 2 技术论文（回测引擎 + 信号融合）
+│   └── IMPLEMENTATION_WHITEPAPER.md  # 系统实现白皮书
+├── CONTRIBUTING.md              # 贡献指南
+├── LICENSE                      # MIT 许可证
 ├── CHANGELOG.md
 └── README.md
 ```
@@ -630,10 +637,14 @@ sequenceDiagram
 
 我们欢迎量化交易员、数据科学家和开发者的贡献！
 
+详细的开发环境搭建、代码规范、提交规范和 PR 流程请参考 **[CONTRIBUTING.md](CONTRIBUTING.md)**。
+
+快速开始：
+
 1. **Fork** 本仓库并创建你的分支（`git checkout -b feature/AmazingFeature`）。
-2. **编码** 遵循风格指南：Black（Python，行宽=120）和 Prettier（TypeScript，2 空格缩进）。
+2. **编码** 遵循风格指南：Ruff（Python）和 ESLint + Prettier（TypeScript）。
 3. **测试** 用 pytest 运行测试并确保现有测试通过。
-4. **提交** 使用清晰的提交消息（`git commit -m 'Add: 螺旋律扩展位计算'`）。
+4. **提交** 使用 [Conventional Commits](https://www.conventionalcommits.org/) 格式（`git commit -m 'feat(backtest): 新增参数扫描'`）。
 5. **推送** 到你的分支并打开 Pull Request。
 
 请确保你的 PR 包含：
@@ -645,7 +656,20 @@ sequenceDiagram
 
 ## 许可证与参考文献
 
-本项目采用 **MIT 许可证**。详见 [LICENSE](LICENSE)。
+本项目采用 **MIT 许可证**。详见 [LICENSE](LICENSE)。贡献指南详见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+
+### 技术文档
+
+| 文档 | 说明 |
+|------|------|
+| [docs/PAPER.md](docs/PAPER.md) | Phase 1 学术论文 — 鲁兆理论 + TOMAS-AGI 融合架构 |
+| [docs/PAPER-phase2.md](docs/PAPER-phase2.md) | Phase 2 技术论文 — 事件驱动回测引擎 + 多理论信号融合 |
+| [docs/IMPLEMENTATION_WHITEPAPER.md](docs/IMPLEMENTATION_WHITEPAPER.md) | 系统实现白皮书 — 全栈工程实现详解 |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Phase 1 系统架构设计 |
+| [docs/ARCHITECTURE-phase2.md](docs/ARCHITECTURE-phase2.md) | Phase 2 系统架构设计 |
+| [docs/API_DOCUMENTATION.md](docs/API_DOCUMENTATION.md) | REST API + WebSocket 接口文档 |
+| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | 部署指南 |
+| [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | 开发指南 |
 
 ### 主要参考文献
 
