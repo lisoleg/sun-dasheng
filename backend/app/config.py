@@ -17,7 +17,7 @@ class Settings(BaseSettings):
 
     # 应用基础配置
     APP_NAME: str = "孙大圣量化交易系统"
-    APP_VERSION: str = "0.1.0"
+    APP_VERSION: str = "0.2.0"
     DEBUG: bool = False
 
     # 数据库配置
@@ -56,6 +56,17 @@ class Settings(BaseSettings):
 
     # CORS配置
     CORS_ORIGINS: List[str] = ["http://localhost:5173", "http://localhost:3000", "http://127.0.0.1:5173"]
+
+    # 回测引擎配置
+    BACKTEST_MAX_WORKERS: int = 4
+    BACKTEST_TIMEOUT_SEC: int = 600
+    BACKTEST_MAX_PARAMS_PER_SCAN: int = 1000
+
+    # PDF报告配置
+    PDF_OUTPUT_DIR: str = "./reports/pdf"
+    CSV_OUTPUT_DIR: str = "./reports/csv"
+    REPORT_TEMPLATE_PATH: str = "./app/templates/backtest_report.html.j2"
+    REPORT_FONT_PATH: str = "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc"
 
     # 日志配置
     LOG_LEVEL: str = "INFO"

@@ -142,7 +142,7 @@ async def _mock_push_loop() -> None:
 app = FastAPI(
     title="孙大圣量化交易系统",
     description="基于鲁兆理论的A股/加密货币量化交易系统",
-    version="0.1.0",
+    version="0.2.0",
     lifespan=lifespan,
 )
 
@@ -166,7 +166,7 @@ async def health_check() -> Dict[str, Any]:
         "code": 0,
         "data": {
             "status": "healthy",
-            "version": "0.1.0",
+            "version": "0.2.0",
             "ws_connections": ws_hub.get_total_connections(),
         },
         "message": "ok",

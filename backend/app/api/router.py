@@ -7,6 +7,8 @@ from app.api.signal import router as signal_router
 from app.api.order import router as order_router
 from app.api.risk import router as risk_router
 from app.api.strategy import router as strategy_router
+from app.api.backtest import router as backtest_router
+from app.api.preferences import router as preferences_router
 
 api_router = APIRouter(prefix="")
 
@@ -16,3 +18,5 @@ api_router.include_router(signal_router, prefix="/signals", tags=["信号"])
 api_router.include_router(order_router, prefix="/orders", tags=["订单"])
 api_router.include_router(risk_router, prefix="/risk", tags=["风控"])
 api_router.include_router(strategy_router, prefix="/strategy", tags=["策略"])
+api_router.include_router(backtest_router, prefix="/backtest", tags=["回测"])
+api_router.include_router(preferences_router, prefix="/preferences", tags=["用户偏好"])

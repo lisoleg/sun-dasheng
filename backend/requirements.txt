@@ -34,3 +34,21 @@ openai==1.50.0
 # 工具
 python-dotenv==1.0.0
 loguru==0.7.0
+
+# Phase 2 — 回测引擎
+numpy==1.26.0
+pandas==2.2.0
+scipy==1.13.0
+matplotlib==3.9.0
+mplfinance==0.12.10b0
+
+# Phase 2 — PDF 报告导出
+weasyprint==62.3
+jinja2==3.1.0
+markupsafe==2.1.0
+
+# Phase 2 — 测试
+pytest==8.2.0
+pytest-asyncio==0.23.0
+hypothesis==6.103.0
+

@@ -9,6 +9,10 @@
 信号生成规则：
 - direction = LONG / SHORT / HOLD
 - 仅置信度 > 0.3 的信号输出
+
+融合策略选择：
+- 支持 weighted（默认）/ and / or 三种策略
+- 通过 set_strategy() 或构造参数选择
 """
 
 import uuid
@@ -18,6 +22,13 @@ from typing import Any, Dict, List, Optional
 
 from loguru import logger
 
+from app.services.signal.fusion_strategies import (
+    FusionStrategy,
+    WeightedFusionStrategy,
+    AndFusionStrategy,
+    OrFusionStrategy,
+    create_fusion_strategy,
+)
 from app.services.signal.generator import Signal, SignalHint, TheoryResult
 from app.services.tomas.token_bridge import TomasResult
 
@@ -46,14 +57,18 @@ class SignalFusion:
 
     融合流程：
     1. 从理论结果中提取原始信号
-    2. 为每个信号分配权重（初始等权1/N，后续按历史准确率调整）
-    3. 消解冲突：同标的多信号方向相反时，取置信度最高者
-    4. 综合TOMAS终裁，计算最终置信度
-    5. 过滤低置信度信号（>0.3）
+    2. 使用选择的融合策略融合信号
+    3. 综合TOMAS终裁，计算最终置信度
+    4. 过滤低置信度信号（>0.3）
 
     权重分配策略：
     - 初始：各引擎等权 1/N
     - 后续：根据历史准确率动态调整（预留接口）
+
+    融合策略：
+    - weighted（默认）：加权平均
+    - and：所有引擎一致才输出
+    - or：任一引擎信号即输出
     """
 
     # 信号置信度输出阈值
@@ -68,13 +83,38 @@ class SignalFusion:
     # 各理论引擎历史准确率（初始等权，后续可动态更新）
     _engine_weights: Dict[str, float] = {}
 
-    def __init__(self, engine_weights: Optional[Dict[str, float]] = None) -> None:
+    def __init__(
+        self,
+        engine_weights: Optional[Dict[str, float]] = None,
+        fusion_strategy: str = "weighted",
+    ) -> None:
         """初始化信号融合器
 
         Args:
             engine_weights: 各理论引擎权重，默认等权
+            fusion_strategy: 融合策略 (weighted/and/or)
         """
         self._engine_weights = engine_weights or {}
+        self._fusion_strategy_name = fusion_strategy
+        self._fusion_strategy = create_fusion_strategy(
+            fusion_strategy, engine_weights=engine_weights
+        )
+
+    def set_strategy(self, strategy_name: str, **kwargs) -> None:
+        """设置融合策略
+
+        Args:
+            strategy_name: 策略名称 (weighted/and/or)
+            **kwargs: 传递给策略构造函数的参数
+        """
+        self._fusion_strategy_name = strategy_name
+        self._fusion_strategy = create_fusion_strategy(strategy_name, **kwargs)
+        logger.info(f"SignalFusion: switched to '{strategy_name}' strategy")
+
+    @property
+    def fusion_strategy(self) -> str:
+        """当前融合策略名称"""
+        return self._fusion_strategy_name
 
     def fuse(
         self,
@@ -94,7 +134,8 @@ class SignalFusion:
         """
         logger.info(
             f"SignalFusion: fusing {len(theory_results)} theory results "
-            f"with TOMAS result (source={tomas_result.source})"
+            f"with TOMAS result (source={tomas_result.source}), "
+            f"strategy={self._fusion_strategy_name}"
         )
 
         # 步骤1：从理论结果提取原始信号
@@ -106,21 +147,44 @@ class SignalFusion:
                 return [self._create_tomas_signal(tomas_result)]
             return []
 
-        # 步骤2：分配权重
-        weighted_signals = self.weight_signals(raw_signals)
+        # 步骤2：使用融合策略融合信号
+        fused_results = self._fusion_strategy.fuse(raw_signals, theory_results)
 
-        # 步骤3：消解冲突
-        resolved_signals = self.resolve_conflicts(weighted_signals)
+        # 步骤3：转换为Signal列表并综合TOMAS
+        final_signals = []
+        for fused in fused_results:
+            signal = fused.signal
 
-        # 步骤4：综合TOMAS终裁，计算最终置信度
-        final_signals = self.assign_confidence(resolved_signals, tomas_result)
+            # 综合TOMAS终裁
+            direction_bonus = 0.0
+            tomas_direction = self._parse_tomas_direction(tomas_result)
+            tomas_confidence = tomas_result.confidence
 
-        # 步骤5：过滤低置信度信号
+            if tomas_direction and signal.direction != "HOLD":
+                if signal.direction == tomas_direction:
+                    direction_bonus = tomas_confidence * 0.2
+                else:
+                    direction_bonus = -tomas_confidence * 0.3
+
+            theory_component = signal.confidence * self.THEORY_WEIGHT
+            tomas_component = tomas_confidence * self.TOMAS_WEIGHT
+            final_confidence = theory_component + tomas_component + direction_bonus
+            final_confidence = max(0.0, min(1.0, final_confidence))
+
+            signal.confidence = round(final_confidence, 4)
+            signal.source_engine = f"fusion_{self._fusion_strategy_name}"
+            signal.metadata["fusion_strategy"] = self._fusion_strategy_name
+            signal.metadata["tomas_direction"] = tomas_direction
+            signal.metadata["tomas_confidence"] = tomas_confidence
+
+            final_signals.append(signal)
+
+        # 步骤4：过滤低置信度信号
         filtered = [s for s in final_signals if s.confidence > self.CONFIDENCE_THRESHOLD]
 
         logger.info(
             f"SignalFusion: {len(raw_signals)} raw → {len(filtered)} final signals "
-            f"(threshold={self.CONFIDENCE_THRESHOLD})"
+            f"(threshold={self.CONFIDENCE_THRESHOLD}, strategy={self._fusion_strategy_name})"
         )
 
         return filtered

@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>回测报告 - {{ result.config.symbol }}</title>
+    <style>
+        body { font-family: "WenQuanYi Micro Hei", Arial, sans-serif; margin: 20px; }
+        h1 { color: #333; border-bottom: 2px solid #4ECDC4; padding-bottom: 10px; }
+        h2 { color: #555; margin-top: 30px; }
+        table { border-collapse: collapse; width: 100%; margin: 20px 0; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; font-weight: bold; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+        .metric-card {
+            display: inline-block;
+            margin: 10px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            min-width: 150px;
+        }
+        .metric-value { font-size: 24px; font-weight: bold; color: #333; }
+        .metric-label { font-size: 12px; color: #777; }
+        .positive { color: green; }
+        .negative { color: red; }
+        img { max-width: 100%; height: auto; margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <!-- 封面 -->
+    <h1>孙大圣量化交易系统 - 回测报告</h1>
+    <p>策略: {{ result.config.symbol }} | 周期: {{ result.config.timeframe }}</p>
+    <p>时间范围: {{ result.config.start_date }} ~ {{ result.config.end_date }}</p>
+    <p>生成时间: {{ generation_time }}</p>
+
+    <!-- 绩效指标卡片 -->
+    <h2>绩效指标</h2>
+    <div class="metric-card">
+        <div class="metric-label">总收益率</div>
+        <div class="metric-value {% if result.total_return > 0 %}positive{% else %}negative{% endif %}">
+            {{ "%.2f%%"|format(result.total_return * 100) }}
+        </div>
+    </div>
+    <div class="metric-card">
+        <div class="metric-label">年化收益率</div>
+        <div class="metric-value {% if result.annual_return > 0 %}positive{% else %}negative{% endif %}">
+            {{ "%.2f%%"|format(result.annual_return * 100) }}
+        </div>
+    </div>
+    <div class="metric-card">
+        <div class="metric-label">夏普比率</div>
+        <div class="metric-value">{{ "%.2f"|format(result.sharpe_ratio) }}</div>
+    </div>
+    <div class="metric-card">
+        <div class="metric-label">索提诺比率</div>
+        <div class="metric-value">{{ "%.2f"|format(result.sortino_ratio) }}</div>
+    </div>
+    <div class="metric-card">
+        <div class="metric-label">卡尔玛比率</div>
+        <div class="metric-value">{{ "%.2f"|format(result.calmar_ratio) }}</div>
+    </div>
+    <div class="metric-card">
+        <div class="metric-label">最大回撤</div>
+        <div class="metric-value negative">{{ "%.2f%%"|format(result.max_drawdown * 100) }}</div>
+    </div>
+    <div class="metric-card">
+        <div class="metric-label">胜率</div>
+        <div class="metric-value">{{ "%.2f%%"|format(result.win_rate * 100) }}</div>
+    </div>
+    <div class="metric-card">
+        <div class="metric-label">盈亏比</div>
+        <div class="metric-value">{{ "%.2f"|format(result.profit_loss_ratio) }}</div>
+    </div>
+    <div class="metric-card">
+        <div class="metric-label">总交易次数</div>
+        <div class="metric-value">{{ result.total_trades }}</div>
+    </div>
+
+    <!-- 权益曲线图 -->
+    {% if charts.equity %}
+    <h2>权益曲线</h2>
+    <img src="{{ charts.equity }}" alt="权益曲线">
+    {% endif %}
+
+    <!-- 回撤曲线图 -->
+    {% if charts.drawdown %}
+    <h2>回撤曲线</h2>
+    <img src="{{ charts.drawdown }}" alt="回撤曲线">
+    {% endif %}
+
+    <!-- 月度收益热力图 -->
+    {% if charts.monthly %}
+    <h2>月度收益热力图</h2>
+    <img src="{{ charts.monthly }}" alt="月度收益热力图">
+    {% endif %}
+
+    <!-- 交易明细表 -->
+    <h2>交易明细</h2>
+    <table>
+        <tr>
+            <th>ID</th>
+            <th>标的</th>
+            <th>方向</th>
+            <th>开仓时间</th>
+            <th>开仓价</th>
+            <th>平仓时间</th>
+            <th>平仓价</th>
+            <th>数量</th>
+            <th>盈亏</th>
+            <th>盈亏%</th>
+            <th>持仓时长(小时)</th>
+            <th>信号来源</th>
+            <th>平仓原因</th>
+        </tr>
+        {% for trade in result.trades %}
+        <tr>
+            <td>{{ trade.trade_id }}</td>
+            <td>{{ trade.symbol }}</td>
+            <td>{{ trade.direction }}</td>
+            <td>{{ trade.open_time }}</td>
+            <td>{{ "%.2f"|format(trade.open_price) }}</td>
+            <td>{{ trade.close_time or "" }}</td>
+            <td>{{ "%.2f"|format(trade.close_price) if trade.close_price else "" }}</td>
+            <td>{{ "%.4f"|format(trade.quantity) }}</td>
+            <td class="{% if trade.pnl and trade.pnl > 0 %}positive{% elif trade.pnl and trade.pnl < 0 %}negative{% endif %}">
+                {{ "%.2f"|format(trade.pnl) if trade.pnl else "" }}
+            </td>
+            <td class="{% if trade.pnl_pct and trade.pnl_pct > 0 %}positive{% elif trade.pnl_pct and trade.pnl_pct < 0 %}negative{% endif %}">
+                {{ "%.2f%%"|format(trade.pnl_pct * 100) if trade.pnl_pct else "" }}
+            </td>
+            <td>{{ "%.1f"|format(trade.holding_hours) if trade.holding_hours else "" }}</td>
+            <td>{{ trade.signal_source }}</td>
+            <td>{{ trade.exit_reason }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+
+    <hr>
+    <p style="text-align: center; color: #777; font-size: 12px;">
+        本报告由孙大圣量化交易系统自动生成
+    </p>
+</body>
+</html>

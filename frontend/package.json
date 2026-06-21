@@ -12,15 +12,22 @@
   "dependencies": {
     "@emotion/react": "^11.13.0",
     "@emotion/styled": "^11.13.0",
+    "@hookform/resolvers": "^3.10.0",
     "@mui/icons-material": "^5.16.0",
     "@mui/material": "^5.16.0",
+    "@mui/x-data-grid": "^7.29.13",
     "axios": "^1.7.0",
     "d3": "^7.9.0",
     "date-fns": "^3.6.0",
     "lightweight-charts": "^4.1.0",
+    "lucide-react": "^0.400.0",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
+    "react-grid-layout": "^1.5.3",
+    "react-hook-form": "^7.80.0",
     "react-router-dom": "^6.26.0",
+    "recharts": "^2.15.4",
+    "yup": "^1.7.1",
     "zustand": "^4.5.0"
   },
   "devDependencies": {
