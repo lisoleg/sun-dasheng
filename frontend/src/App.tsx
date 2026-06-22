@@ -6,6 +6,8 @@ import SignalsPage from '@/pages/SignalsPage';
 import BacktestPage from '@/pages/BacktestPage';
 import RiskMonitorPage from '@/pages/RiskMonitorPage';
 import KnowledgePage from '@/pages/KnowledgePage';
+import PhaseAnalysisPage from '@/pages/PhaseAnalysisPage';
+import DNADetectionPage from '@/pages/DNADetectionPage';
 
 // 临时占位（T15 会创建真正的 DashboardPage）
 const DashboardPage = React.lazy(() => import('@/pages/DashboardPage').catch(() => ({
@@ -20,6 +22,7 @@ const DashboardPage = React.lazy(() => import('@/pages/DashboardPage').catch(() 
 /**
  * 根组件 - 使用 AppLayout + 路由
  * T12 重写：外层包裹 AppLayout，内嵌路由
+ * TOMAS v2.0: 新增相位分析 + DNA检测路由
  */
 const App: React.FC = () => {
   return (
@@ -33,6 +36,9 @@ const App: React.FC = () => {
           <Route path="/backtest" element={<BacktestPage />} />
           <Route path="/risk" element={<RiskMonitorPage />} />
           <Route path="/knowledge" element={<KnowledgePage />} />
+          {/* TOMAS v2.0 新增 */}
+          <Route path="/phase-analysis" element={<PhaseAnalysisPage />} />
+          <Route path="/dna-detection" element={<DNADetectionPage />} />
           {/* T23 设置页 */}
           <Route path="/settings" element={<div>设置页（T23 实现中）</div>} />
         </Route>

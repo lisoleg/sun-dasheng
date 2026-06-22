@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Tuple
 from loguru import logger
 
 from app.services.theory.base import TheoryEngine, TheoryResult
+from app.core.topo_invariants import apply_phase_filter
 
 # 最小周期长度（K线数）
 MIN_CYCLE_LENGTH = 5
@@ -70,6 +71,11 @@ class CycleLawEngine(TheoryEngine):
         # 计算整体置信度
         confidence = self._calc_confidence(cycle_lengths, next_turn)
 
+        # [TOMAS v2.0] 相位连续性过滤
+        hints, confidence, pcs, is_sing = apply_phase_filter(
+            hints, confidence, bars, log_prefix=self.name
+        )
+
         return TheoryResult(
             theory_name=self.name,
             timestamp=datetime.now(timezone.utc).isoformat(),
@@ -77,9 +83,13 @@ class CycleLawEngine(TheoryEngine):
                 "swing_points": swing_points,
                 "cycle_lengths": cycle_lengths,
                 "next_turn": next_turn,
+                "phase_continuity_score": pcs,
+                "is_phase_singularity": is_sing,
             },
             hints=hints,
             confidence=confidence,
+            phase_continuity=pcs,
+            is_phase_valid=pcs >= 0.7,
         )
 
     def get_annotations(self, bars: List[Dict]) -> List[Dict]:

@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Tuple
 from loguru import logger
 
 from app.services.theory.base import TheoryEngine, TheoryResult
+from app.core.topo_invariants import apply_phase_filter
 
 # BG均线周期
 BG_PERIODS = [4, 8, 16, 32]
@@ -68,6 +69,11 @@ class BGMovingAverageEngine(TheoryEngine):
         # 计算整体置信度
         confidence = self._calc_confidence(crosses, arrangement)
 
+        # [TOMAS v2.0] 相位连续性过滤
+        hints, confidence, pcs, is_sing = apply_phase_filter(
+            hints, confidence, bars, log_prefix=self.name
+        )
+
         return TheoryResult(
             theory_name=self.name,
             timestamp=datetime.now(timezone.utc).isoformat(),
@@ -75,9 +81,13 @@ class BGMovingAverageEngine(TheoryEngine):
                 "bg_ma": bg_ma,
                 "crosses": crosses,
                 "arrangement": arrangement,
+                "phase_continuity_score": pcs,
+                "is_phase_singularity": is_sing,
             },
             hints=hints,
             confidence=confidence,
+            phase_continuity=pcs,
+            is_phase_valid=pcs >= 0.7,
         )
 
     def get_annotations(self, bars: List[Dict]) -> List[Dict]:

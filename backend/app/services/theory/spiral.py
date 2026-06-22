@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Tuple
 from loguru import logger
 
 from app.services.theory.base import TheoryEngine, TheoryResult
+from app.core.topo_invariants import apply_phase_filter
 
 # 斐波那契回撤比例
 FIBONACCI_RETRACEMENT_LEVELS = [0.236, 0.382, 0.5, 0.618, 0.786]
@@ -72,6 +73,11 @@ class SpiralEngine(TheoryEngine):
         # 计算整体置信度
         confidence = self._calc_confidence(bars, spiral_points)
 
+        # [TOMAS v2.0] 相位连续性过滤
+        hints, confidence, pcs, is_sing = apply_phase_filter(
+            hints, confidence, bars, log_prefix=self.name
+        )
+
         return TheoryResult(
             theory_name=self.name,
             timestamp=datetime.now(timezone.utc).isoformat(),
@@ -81,9 +87,13 @@ class SpiralEngine(TheoryEngine):
                 "retracement_levels": retracement_levels,
                 "extension_levels": extension_levels,
                 "spiral_points": spiral_points,
+                "phase_continuity_score": pcs,
+                "is_phase_singularity": is_sing,
             },
             hints=hints,
             confidence=confidence,
+            phase_continuity=pcs,
+            is_phase_valid=pcs >= 0.7,
         )
 
     def get_annotations(self, bars: List[Dict]) -> List[Dict]:

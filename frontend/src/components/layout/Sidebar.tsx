@@ -20,6 +20,8 @@ import {
   Network,
   Settings,
   ChevronRight,
+  Activity,
+  Dna,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -36,6 +38,9 @@ const NAV_ITEMS = [
   { path: '/backtest', label: '回测', icon: FlaskConical },
   { path: '/risk', label: '风控', icon: ShieldAlert },
   { path: '/knowledge', label: '知识图谱', icon: Network },
+  // TOMAS v2.0 新增
+  { path: '/phase-analysis', label: '相位分析', icon: Activity },
+  { path: '/dna-detection', label: 'DNA检测', icon: Dna },
 ];
 
 const Sidebar: React.FC<SidebarProps> = ({ open }) => {

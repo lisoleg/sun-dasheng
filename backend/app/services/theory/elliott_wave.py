@@ -15,6 +15,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from loguru import logger
 
 from app.services.theory.base import TheoryEngine, TheoryResult
+from app.core.topo_invariants import apply_phase_filter
 
 # ZigZag阈值用于识别极值点
 ZIGZAG_THRESHOLD = 0.03  # 3%用于波浪识别（比太极中心律更敏感）
@@ -72,6 +73,11 @@ class ElliottWaveEngine(TheoryEngine):
         # 计算置信度
         confidence = self._calc_confidence(bars, impulse_waves, corrective_waves)
 
+        # [TOMAS v2.0] 相位连续性过滤
+        hints, confidence, pcs, is_sing = apply_phase_filter(
+            hints, confidence, bars, log_prefix=self.name
+        )
+
         return TheoryResult(
             theory_name=self.name,
             timestamp=datetime.now(timezone.utc).isoformat(),
@@ -81,9 +87,13 @@ class ElliottWaveEngine(TheoryEngine):
                 "corrective_waves": corrective_waves,
                 "labeled_waves": labeled_waves,
                 "current_wave": current_wave,
+                "phase_continuity_score": pcs,
+                "is_phase_singularity": is_sing,
             },
             hints=hints,
             confidence=confidence,
+            phase_continuity=pcs,
+            is_phase_valid=pcs >= 0.7,
         )
 
     def get_annotations(self, bars: List[Dict]) -> List[Dict]:

@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Tuple
 from loguru import logger
 
 from app.services.theory.base import TheoryEngine, TheoryResult
+from app.core.topo_invariants import apply_phase_filter
 
 # 江恩关键角度
 GANN_ANGLES = [
@@ -81,6 +82,11 @@ class GannAngleEngine(TheoryEngine):
         # 计算整体置信度
         confidence = self._calc_confidence(gann_lines, price_position)
 
+        # [TOMAS v2.0] 相位连续性过滤
+        hints, confidence, pcs, is_sing = apply_phase_filter(
+            hints, confidence, bars, log_prefix=self.name
+        )
+
         return TheoryResult(
             theory_name=self.name,
             timestamp=datetime.now(timezone.utc).isoformat(),
@@ -88,9 +94,13 @@ class GannAngleEngine(TheoryEngine):
                 "start_point": start_point,
                 "gann_lines": gann_lines,
                 "price_position": price_position,
+                "phase_continuity_score": pcs,
+                "is_phase_singularity": is_sing,
             },
             hints=hints,
             confidence=confidence,
+            phase_continuity=pcs,
+            is_phase_valid=pcs >= 0.7,
         )
 
     def get_annotations(self, bars: List[Dict]) -> List[Dict]:

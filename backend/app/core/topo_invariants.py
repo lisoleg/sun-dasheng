@@ -520,6 +520,62 @@ def detect_invariant_cycles(
 
 
 # ─────────────────────────────────────────────
+# 通用相位过滤工具（供所有理论引擎调用）
+# ─────────────────────────────────────────────
+
+def apply_phase_filter(
+    hints: list,
+    confidence: float,
+    bars: list,
+    window: int = 30,
+    log_prefix: str = ""
+) -> tuple:
+    """
+    通用相位连续性过滤函数（TOMAS v2.0）
+    
+    供所有理论引擎在 analyze() 返回前调用，统一应用相位过滤逻辑：
+    
+    - PCS < 0.3（相变奇点区）：清空所有信号，置信度降至 10%
+    - 0.3 <= PCS < 0.7（过渡区）：信号置信度减半，整体置信度减半
+    - PCS >= 0.7（相位连续区）：信号正常输出
+    
+    Args:
+        hints: 原始信号列表
+        confidence: 原始置信度
+        bars: K线数据列表
+        window: PCS计算窗口
+        log_prefix: 日志前缀（引擎名称）
+    
+    Returns:
+        (filtered_hints, adjusted_confidence, pcs, is_singularity)
+    """
+    import numpy as np
+    from loguru import logger
+    
+    closes = np.array([float(bar.get("close", 0)) for bar in bars])
+    pcs = phase_continuity_score(closes, window=window)
+    singularity = detect_phase_singularity(closes, threshold=0.3)
+    is_sing = singularity.get("is_singularity", False)
+    
+    filtered_hints = list(hints)
+    adjusted_confidence = confidence
+    
+    if is_sing:
+        # 相变奇点区：清空信号，强制熔断
+        filtered_hints = []
+        adjusted_confidence = confidence * 0.1
+        logger.warning(f"[{log_prefix}] Phase singularity: PCS={pcs:.3f}, clearing all hints")
+    elif pcs < 0.7:
+        # 过渡区：降低置信度
+        adjusted_confidence = confidence * 0.5
+        for hint in filtered_hints:
+            hint["confidence"] = hint.get("confidence", 0) * 0.5
+        logger.info(f"[{log_prefix}] Phase transition zone: PCS={pcs:.3f}, reducing confidence")
+    
+    return filtered_hints, adjusted_confidence, pcs, is_sing
+
+
+# ─────────────────────────────────────────────
 # 模块自检
 # ─────────────────────────────────────────────
 
