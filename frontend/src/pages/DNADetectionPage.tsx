@@ -6,6 +6,7 @@
  * - κ-Snap溯因验证结果
  * - 波浪倍数检测结果表
  * - 斐波那契/鲁加斯数验证
+ * - 【新增】波浪结构可视化图
  */
 
 import React, { useState, useEffect, useCallback } from "react";
@@ -29,6 +30,18 @@ import {
   TableRow,
   Paper,
 } from "@mui/material";
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  ReferenceLine,
+  Scatter,
+  ComposedChart,
+} from "recharts";
 import { Dna, CheckCircle2, XCircle, Search } from "lucide-react";
 
 // ── 类型定义 ──
@@ -62,7 +75,75 @@ interface DNADetectionData {
   phase_valid: boolean;
   pcs: number;
   summary: string;
+  wave_chart?: Array<{
+    bar_index: number;
+    price: number;
+    wave_label?: string;
+    is_swing?: boolean;
+  }>;
 }
+
+// ── 波浪模拟数据生成 ──
+const generateWaveChartData = (genes: DNAGene[]) => {
+  const data: Array<{
+    bar_index: number;
+    price: number;
+    wave_label?: string;
+    is_swing?: boolean;
+  }> = [];
+  if (!genes.length) return data;
+
+  const totalBars = Math.max(...genes.map((g) => g.end_index)) + 10;
+  let price = 3000;
+  const baseIdx = 0;
+
+  // 根据 gene 生成价格走势
+  for (const gene of genes) {
+    const start = gene.start_index;
+    const end = gene.end_index;
+    const isUp = gene.wave_label.includes("1") || gene.wave_label.includes("3") || gene.wave_label.includes("5");
+    const direction = isUp ? 1 : -1;
+    const totalChange = gene.amplitude * direction;
+
+    for (let i = start; i <= end; i++) {
+      const progress = (i - start) / (end - start);
+      // 模拟波浪形状（加速-减速）
+      const shaped = progress < 0.5
+        ? 2 * progress * progress
+        : 1 - 2 * (1 - progress) * (1 - progress);
+      price = (price || 3000) + (totalChange * (shaped - (data[data.length - 1]?.price ? 0 : 0)) / (end - start + 1);
+      // 简化：直接用线性+噪声
+      const noise = (Math.random() - 0.5) * 10;
+      const barPrice = 3000 + (i * 5) + (isUp ? i * 3 : -i * 2) + noise;
+      data.push({
+        bar_index: i,
+        price: Math.round(barPrice * 100) / 100,
+        wave_label: i === start ? gene.wave_label : undefined,
+        is_swing: i === start || i === end,
+      });
+    }
+  }
+  return data;
+};
+
+// ── 自定义 Tooltip ──
+const WaveTooltip = ({ active, payload }: any) => {
+  if (!active || !payload?.length) return null;
+  const d = payload[0].payload;
+  return (
+    <Box sx={{ bgcolor: "#161b22", border: "1px solid #30363d", p: 1.5, borderRadius: 1 }}>
+      <Typography variant="caption" sx={{ color: "#8b949e" }}>
+        Bar #{d.bar_index}
+      </Typography>
+      <Typography variant="body2" sx={{ color: "#e6edf3", fontWeight: 700 }}>
+        价格: {d.price.toFixed(2)}
+      </Typography>
+      {d.wave_label && (
+        <Chip label={d.wave_label} size="small" sx={{ bgcolor: "rgba(88,166,255,0.15)", color: "#58a6ff", mt: 0.5 }} />
+      )}
+    </Box>
+  );
+};
 
 // ── 主组件 ──
 const DNADetectionPage: React.FC = () => {
@@ -80,18 +161,23 @@ const DNADetectionPage: React.FC = () => {
       );
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const json = await resp.json();
+      // 后端暂未返回 wave_chart，前端生成模拟数据
+      if (!json.wave_chart && json.genes) {
+        json.wave_chart = generateWaveChartData(json.genes);
+      }
       setData(json);
     } catch (e) {
       setError(e instanceof Error ? e.message : "请求失败");
       // 降级：模拟数据
+      const mockGenes = [
+        { wave_label: "浪1", amplitude: 320.5, duration: 13, start_index: 10, end_index: 23 },
+        { wave_label: "浪2", amplitude: 198.3, duration: 8, start_index: 23, end_index: 31 },
+        { wave_label: "浪3", amplitude: 518.7, duration: 21, start_index: 31, end_index: 52 },
+        { wave_label: "浪4", amplitude: 240.1, duration: 13, start_index: 52, end_index: 65 },
+        { wave_label: "浪5", amplitude: 345.2, duration: 21, start_index: 65, end_index: 86 },
+      ];
       setData({
-        genes: [
-          { wave_label: "浪1", amplitude: 320.5, duration: 13, start_index: 10, end_index: 23 },
-          { wave_label: "浪2", amplitude: 198.3, duration: 8, start_index: 23, end_index: 31 },
-          { wave_label: "浪3", amplitude: 518.7, duration: 21, start_index: 31, end_index: 52 },
-          { wave_label: "浪4", amplitude: 240.1, duration: 13, start_index: 52, end_index: 65 },
-          { wave_label: "浪5", amplitude: 345.2, duration: 21, start_index: 65, end_index: 86 },
-        ],
+        genes: mockGenes,
         ksnap_verified: true,
         ksnap_score: 0.78,
         fibonacci_verification: {
@@ -109,6 +195,7 @@ const DNADetectionPage: React.FC = () => {
         phase_valid: true,
         pcs: 0.75,
         summary: "DNA倍发生成验证通过：80%斐波那契匹配 + κ-Snap验证通过 + 相位连续",
+        wave_chart: generateWaveChartData(mockGenes),
       });
     } finally {
       setLoading(false);
@@ -119,8 +206,13 @@ const DNADetectionPage: React.FC = () => {
     fetchDetection();
   }, [fetchDetection]);
 
+  // 获取波浪边界用于图表标注
+  const waveMarkers = data?.wave_chart
+    ?.filter((d) => d.wave_label)
+    .map((d) => d.bar_index) ?? [];
+
   return (
-    <Box sx={{ p: 3, maxWidth: 1200, mx: "auto" }}>
+    <Box sx={{ p: 3, maxWidth: 1400, mx: "auto" }}>
       {/* 标题栏 */}
       <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 3 }}>
         <Dna size={24} color="#58a6ff" />
@@ -258,6 +350,78 @@ const DNADetectionPage: React.FC = () => {
                 </Card>
               </Grid>
             </Grid>
+          </Grid>
+
+          {/* ── 新增：波浪结构可视化图 ── */}
+          <Grid item xs={12}>
+            <Card sx={{ bgcolor: "#161b22", border: "1px solid #30363d" }}>
+              <CardContent>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
+                  <Dna size={18} color="#58a6ff" />
+                  <Typography variant="h6" sx={{ color: "#e6edf3" }}>
+                    波浪结构可视化
+                  </Typography>
+                  <Chip label="模拟数据" size="small" sx={{ bgcolor: "rgba(210,153,34,0.15)", color: "#d29922", fontSize: 10 }} />
+                </Box>
+                <Divider sx={{ mb: 2, borderColor: "#30363d" }} />
+                <Box sx={{ width: "100%", height: 320 }}>
+                  <ResponsiveContainer>
+                    <ComposedChart data={data.wave_chart ?? []}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#21262d" />
+                      <XAxis
+                        dataKey="bar_index"
+                        stroke="#8b949e"
+                        fontSize={11}
+                        label={{ value: "K线序号", position: "insideBottom", offset: -5, fill: "#8b949e", fontSize: 11 }}
+                      />
+                      <YAxis
+                        stroke="#8b949e"
+                        fontSize={11}
+                        label={{ value: "价格", angle: -90, position: "insideLeft", fill: "#8b949e", fontSize: 11 }}
+                      />
+                      <Tooltip content={<WaveTooltip />} />
+                      {/* 价格面积图 */}
+                      <Area
+                        type="monotone"
+                        dataKey="price"
+                        stroke="#58a6ff"
+                        fill="rgba(88,166,255,0.08)"
+                        strokeWidth={2}
+                        name="价格"
+                      />
+                      {/* 波浪边界散点 */}
+                      <Scatter
+                        dataKey="price"
+                        fill="#f0883e"
+                        shape="diamond"
+                        legendType="none"
+                      />
+                      {/* 波浪标注线 */}
+                      {waveMarkers.map((idx) => {
+                        const point = data.wave_chart?.find((d) => d.bar_index === idx);
+                        return point ? (
+                          <ReferenceLine
+                            key={idx}
+                            x={idx}
+                            stroke="#f0883e"
+                            strokeDasharray="3 3"
+                            label={{
+                              value: point.wave_label,
+                              position: "top",
+                              fill: "#f0883e",
+                              fontSize: 11,
+                            }}
+                          />
+                        ) : null;
+                      })}
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                </Box>
+                <Typography variant="caption" sx={{ color: "#8b949e", display: "block", mt: 1 }}>
+                  📊 面积图展示价格走势 · 🔷 菱形标记波浪起点 · 虚线标注波浪边界
+                </Typography>
+              </CardContent>
+            </Card>
           </Grid>
 
           {/* DNA基因卡片 */}
