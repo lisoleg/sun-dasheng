@@ -144,3 +144,157 @@ async def _cleanup_providers():
     if _binance_provider:
         await _binance_provider.disconnect()
         logger.info("BinanceProvider disconnected")
+
+
+# ─────────────────────────────────────────────
+# [TOMAS v2.0] 新增端点：相位分析 + DNA 检测
+# ─────────────────────────────────────────────
+
+@router.get("/phase-analysis")
+async def get_phase_analysis(
+    symbol: str = Query("BTCUSDT", description="标的代码"),
+    timeframe: str = Query("1d", description="时间周期"),
+    limit: int = Query(100, ge=30, le=1000, description="K线数量"),
+) -> Dict[str, Any]:
+    """
+    相位连续性分析（TOMAS v2.0）
+    
+    返回：
+    - pcs: 相位连续性评分 [0, 1]
+    - regime: 市场状态（phase_continuous/transition/phase_singularity）
+    - action: 建议操作（normal/caution/circuit_break）
+    - taiji_idx: 太极中心索引
+    """
+    try:
+        # 1. 获取K线数据
+        if symbol.endswith("USDT") or symbol.endswith("BUSD"):
+            provider = await _get_binance_provider()
+        else:
+            provider = await _get_tdx_provider()
+        
+        bars_data = await provider.get_bars(symbol, timeframe, limit)
+        
+        if not bars_data:
+            return {
+                "code": 2001,
+                "data": None,
+                "message": f"无行情数据: {symbol}",
+            }
+        
+        # 2. 转换为 numpy 数组
+        import numpy as np
+        closes = np.array([float(bar.close) for bar in bars_data])
+        volumes = np.array([float(bar.volume) for bar in bars_data])
+        
+        # 3. 相位连续性分析
+        from app.services.market.phase_analyzer import analyze_phase_continuity
+        result = analyze_phase_continuity(closes, volumes, window=30)
+        
+        # 4.  format 响应
+        return {
+            "code": 0,
+            "data": {
+                "symbol": symbol,
+                "timeframe": timeframe,
+                "pcs": round(result["pcs"], 4),
+                "regime": result["regime"],
+                "action": result["action"],
+                "taiji_idx": result.get("taiji_idx"),
+                "singularity": result.get("singularity"),
+                "lob_depth": result.get("lob_depth"),
+            },
+            "message": "ok",
+        }
+        
+    except Exception as e:
+        logger.error(f"API /phase-analysis error: {e}")
+        return {
+            "code": 2002,
+            "data": None,
+            "message": f"相位分析失败: {str(e)}",
+        }
+
+
+@router.get("/dna-detection")
+async def get_dna_detection(
+    symbol: str = Query("BTCUSDT", description="标的代码"),
+    timeframe: str = Query("1d", description="时间周期"),
+    limit: int = Query(200, ge=50, le=1000, description="K线数量（需要足够多为DNA检测）"),
+) -> Dict[str, Any]:
+    """
+    鲁兆 DNA 倍发生成验证（TOMAS v2.0）
+    
+    返回：
+    - dna: 检测到的 DNA 基因（第一浪时间和幅度）
+    - fibonacci_match: 是否满足斐波那契倍数
+    - lucas_match: 是否满足鲁加斯自相似
+    - mdl_score: MDL 压缩得分
+    - confidence: DNA 置信度
+    """
+    try:
+        # 1. 获取K线数据
+        if symbol.endswith("USDT") or symbol.endswith("BUSD"):
+            provider = await _get_binance_provider()
+        else:
+            provider = await _get_tdx_provider()
+        
+        bars_data = await provider.get_bars(symbol, timeframe, limit)
+        
+        if not bars_data or len(bars_data) < 50:
+            return {
+                "code": 2001,
+                "data": None,
+                "message": f"数据不足（需要≥50根K线）: {symbol}",
+            }
+        
+        # 2. 检测波浪
+        import numpy as np
+        closes = np.array([float(bar.close) for bar in bars_data])
+        
+        from app.core.dna_replication import detect_waves, extract_dna, ksnap_verify
+        waves = detect_waves(closes, method="zigzag")
+        
+        if not waves or len(waves) < 3:
+            return {
+                "code": 2003,
+                "data": {
+                    "dna": None,
+                    "wave_count": len(waves) if waves else 0,
+                    "message": "未检测到足够波浪（需要≥3浪）",
+                },
+                "message": "DNA检测失败：波浪不足",
+            }
+        
+        # 3. 提取 DNA
+        dna = extract_dna(closes, waves)
+        
+        if not dna:
+            return {
+                "code": 2004,
+                "data": None,
+                "message": "DNA基因提取失败",
+            }
+        
+        # 4. κ-Snap 验证
+        verify_result = ksnap_verify(closes, dna)
+        
+        # 5.  format 响应
+        return {
+            "code": 0,
+            "data": {
+                "symbol": symbol,
+                "timeframe": timeframe,
+                "dna": dna.to_dict(),
+                "wave_count": len(waves),
+                "ksnap_verify": verify_result,
+            },
+            "message": "ok",
+        }
+        
+    except Exception as e:
+        logger.error(f"API /dna-detection error: {e}")
+        return {
+            "code": 2005,
+            "data": None,
+            "message": f"DNA检测失败: {str(e)}",
+        }
