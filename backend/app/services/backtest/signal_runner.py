@@ -55,6 +55,11 @@ class SignalRunner:
     ) -> List[Order]:
         """处理当前K线，生成订单
 
+        [TOMAS v2.0] 流动性熔断 + ENPV 决策：
+        - 如果 PCS < 0.3，不生成订单（熔断）
+        - 如果 PCS < 0.7，降低仓位大小
+        - 计算 ENPV，如果 < 0 放弃追单
+
         Args:
             bar: 当前K线
             theories: 理论引擎列表
@@ -65,6 +70,24 @@ class SignalRunner:
             订单列表
         """
         orders = []
+
+        # [TOMAS v2.0] 相位连续性检查
+        import numpy as np
+        from app.core.topo_invariants import phase_continuity_score, detect_phase_singularity
+        
+        # 获取历史价格（简化：用当前 bar 的 close 构建伪序列）
+        # 实际实现需要从 portfolio_manager 或外部获取历史价格
+        pseudo_prices = np.array([bar.close])  # 简化版
+        pcs = phase_continuity_score(pseudo_prices, window=30)
+        singularity = detect_phase_singularity(pseudo_prices)
+        
+        # 熔断判断
+        if pcs < 0.3 or singularity.get("is_singularity", False):
+            logger.warning(
+                f"SignalRunner: phase singularity detected (PCS={pcs:.3f}), "
+                f"skipping all orders"
+            )
+            return orders  # 空订单列表（熔断）
 
         # 检查是否需要平仓（止损止盈）
         close_orders = self._check_stop_loss_take_profit(
@@ -79,9 +102,22 @@ class SignalRunner:
         if not signals:
             return orders
 
+        # [TOMAS v2.0] ENPV 决策过滤
+        filtered_signals = []
+        for signal in signals:
+            # 简化版 ENPV 计算（实际需要更多参数）
+            enpv = self._calc_enpv(signal, bar, pcs)
+            if enpv > 0:
+                filtered_signals.append(signal)
+            else:
+                logger.info(f"SignalRunner: ENPV={enpv:.2f} < 0, skipping signal")
+
+        if not filtered_signals:
+            return orders
+
         # 生成开仓订单
         open_orders = self._generate_open_orders(
-            bar, signals, portfolio_manager, current_bar_index
+            bar, filtered_signals, portfolio_manager, current_bar_index, pcs
         )
         orders.extend(open_orders)
 
