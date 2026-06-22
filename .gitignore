@@ -58,3 +58,4 @@ coverage.xml
 tmp/
 temp/
 *.tmp
+.workbuddy/

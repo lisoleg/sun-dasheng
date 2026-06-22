@@ -21,7 +21,7 @@ class Signal(Base, BaseMixin):
     source_engine: Mapped[str] = mapped_column(String(32), nullable=False, comment="来源引擎：taiji/spiral/elliott/tomas")
     theory_name: Mapped[str] = mapped_column(String(64), nullable=False, default="", comment="理论名称")
     timestamp: Mapped[str] = mapped_column(String(64), nullable=False, comment="信号时间戳 ISO 8601")
-    metadata: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, comment="信号元数据")
+    meta_data: Mapped[dict] = mapped_column("metadata", JSONB, nullable=False, default=dict, comment="信号元数据")
 
     __table_args__ = (
         Index("ix_signals_symbol", "symbol"),

@@ -37,7 +37,17 @@
 
 ## 核心特性
 
-### v0.2.0 (Phase 2 — 当前版本)
+### v0.2.1 (TOMAS v2.0 升级 — 当前版本)
+
+- **🔮 拓扑不变量库** — 鲁加斯数列（Lucas Numbers）与八卦常数（Bagua Constants）的形式化实现，为所有理论引擎提供拓扑约束验证
+- **🌊 相位连续性分析（PCS）** — 基于 LOB 深度熵的相位连续性评分系统（Phase Continuity Score），实现三档熔断机制：PCS≥0.7 正常交易 / 0.3-0.7 降权 / <0.3 熔断中止
+- **🧬 DNA 倍发生成验证** — 鲁兆 DNA 基因提取 + 斐波那契/鲁加斯自相似验证 + κ-Snap 外推推理，检测市场 DNA 倍数复制模式
+- **⚙️ 全引擎相位过滤** — 7 个理论引擎统一接入 `apply_phase_filter()` 通用相位过滤函数，信号融合层增加全局相位连续性门控
+- **📊 前端图表增强** — PhaseAnalysisPage 新增 PCS 历史走势线图 + PCS/价格双 Y 轴叠加图；DNADetectionPage 新增波浪结构可视化（面积图 + 菱形标记 + 虚线边界）
+- **🔧 工程修复** — 解决信号模块循环导入（提取 base.py）、SQLAlchemy `metadata` 保留字冲突、async_session_factory 命名一致性、Python 3.10 兼容性
+- **📄 Phase 3 规划** — 基于代币化 AGI 经济架构的多 Agent 协作交易机制规划文档
+
+### v0.2.0 (Phase 2)
 
 - **🎨 专业级 Web UI 重设计** — Bloomberg/TradingView 风格深色主题，可拖拽面板布局（react-grid-layout），7 个核心页面全面升级
 - **📊 完整回测引擎** — 事件驱动回测核心，支持鲁兆全 7 理论策略回测，参数扫描 + Celery 并行优化，权益曲线 / 回撤曲线 / 绩效指标全景展示
@@ -79,6 +89,9 @@ graph TD
     RE["风控引擎<br/>(止损/止盈/仓位/ VaR)"]
     DB["数据层<br/>(SQLite dev / PostgreSQL prod)"]
     EXPORT["导出服务<br/>(weasyprint PDF / CSV)"]
+    TOPO["拓扑不变量库 🆕<br/>(鲁加斯数列 / 八卦常数)"]
+    PCS["相位连续性分析 🆕<br/>(PCS评分 + LOB熵 + 熔断)"]
+    DNA["DNA倍发生成验证 🆕<br/>(基因提取 + κ-Snap外推)"]
 
     FE -->|REST + WebSocket × 5 频道| API
     LAYOUT --> FE
@@ -87,9 +100,14 @@ graph TD
     API --> TE
     API --> TOMAS
     API --> BE
+    API --> PCS
+    API --> DNA
     MD --> SF
     TE --> SF
     TOMAS --> SF
+    TOPO --> TE
+    PCS --> SF
+    DNA --> BE
     SF --> BE
     BE --> CELERY
     BE --> EXPORT
@@ -320,6 +338,8 @@ npm run dev
 |------|------|------|
 | GET | `/api/market/bars` | 获取 K 线（OHLCV）数据 |
 | GET | `/api/market/symbols` | 列出可用交易标的 |
+| GET | `/api/market/phase-analysis` | 相位连续性分析（TOMAS v2.0 新增） |
+| GET | `/api/market/dna-detection` | DNA 倍发生成验证（TOMAS v2.0 新增） |
 
 #### 信号
 
@@ -425,9 +445,9 @@ sun-dasheng/
 │   │   │   │   ├── event_loop.py    # 事件驱动主循环
 │   │   │   │   ├── portfolio.py     # 仓位与资金管理
 │   │   │   │   ├── order_book.py    # 订单簿与撮合
-│   │   │   │   ├── slippage_model.py # 滑点模型
+│   │   │   │   ├── slippage_model.py # 滑点模型（TOMAS v2.0: 相位失配成本）
 │   │   │   │   ├── position_manager.py # 仓位计算器（Kelly/risk_parity）
-│   │   │   │   ├── signal_runner.py # 信号执行器
+│   │   │   │   ├── signal_runner.py # 信号执行器（TOMAS v2.0: 流动性熔断+ENPV）
 │   │   │   │   ├── metrics.py       # 16 项绩效指标（numpy 向量化）
 │   │   │   │   ├── benchmark.py     # 基准收益计算
 │   │   │   │   ├── repository.py    # 回测结果持久化
@@ -436,22 +456,28 @@ sun-dasheng/
 │   │   │   │   ├── report_generator.py # PDF/CSV 报告生成
 │   │   │   │   └── exporter.py      # 导出入口
 │   │   │   ├── theory/           # 鲁兆理论引擎（7 个全量）
-│   │   │   │   ├── base.py
+│   │   │   │   ├── base.py       # TheoryEngine基类（含phase_continuity字段）
 │   │   │   │   ├── taiji.py
-│   │   │   │   ├── spiral.py
-│   │   │   │   ├── elliott.py
-│   │   │   │   ├── dual_law.py     # 对偶律（Phase 2 新增）
-│   │   │   │   ├── cycle_law.py    # 周期律（Phase 2 新增）
-│   │   │   │   ├── gann_angle.py   # 江恩角度线（Phase 2 新增）
-│   │   │   │   └── bg_moving_average.py # BG 均线（Phase 2 新增）
+│   │   │   │   ├── spiral.py     # TOMAS v2.0: +apply_phase_filter()
+│   │   │   │   ├── elliott_wave.py # TOMAS v2.0: +apply_phase_filter()
+│   │   │   │   ├── dual_law.py     # TOMAS v2.0: +apply_phase_filter()
+│   │   │   │   ├── cycle_law.py    # TOMAS v2.0: +apply_phase_filter()
+│   │   │   │   ├── gann_angle.py   # TOMAS v2.0: +apply_phase_filter()
+│   │   │   │   └── bg_moving_average.py # TOMAS v2.0: +apply_phase_filter()
 │   │   │   ├── signal/           # 信号融合
+│   │   │   │   ├── base.py       # 信号基类（TOMAS v2.0 新增，解决循环导入）
 │   │   │   │   ├── fusion.py
-│   │   │   │   ├── fusion_strategies.py # AND/OR/WEIGHTED（Phase 2 新增）
+│   │   │   │   ├── fusion_strategies.py # AND/OR/WEIGHTED + 全局相位过滤
 │   │   │   │   └── generator.py
+│   │   │   ├── market/          # 市场分析（TOMAS v2.0 新增）
+│   │   │   │   └── phase_analyzer.py # 相位连续性分析器（PCS+LOB熵+熔断）
 │   │   │   ├── market_data/
 │   │   │   ├── tomas/
 │   │   │   ├── execution/
 │   │   │   └── risk/
+│   │   ├── core/               # 核心库（TOMAS v2.0 新增）
+│   │   │   ├── topo_invariants.py  # 拓扑不变量（鲁加斯/八卦常数+apply_phase_filter）
+│   │   │   └── dna_replication.py  # DNA倍发生成验证（基因提取+κ-Snap）
 │   │   ├── tasks/                # Celery 任务
 │   │   │   ├── celery_app.py
 │   │   │   ├── backtest_tasks.py # 回测异步任务（Phase 2）
@@ -625,11 +651,12 @@ sequenceDiagram
 | 阶段 | 目标 | 里程碑 |
 |------|------|--------|
 | **v0.1.0** (已完成) | MVP | 核心前后端 + 3 个理论引擎（P0）+ Mock TOMAS-AGI + Mock 交易 + 回测 UI 占位 |
-| **v0.2.0** (当前) | 完整回测 + 专业 UI | 回测引擎完整实现 + 7 理论全量 + 可拖拽 UI + PDF 导出 + WebSocket 增强 |
-| **v0.3.0** | 实盘对接 | 接入真实币安 API + 通达信实时行情 + EML 知识蒸馏 + 自动交易开关 |
-| **v0.4.0** | 风控强化 | 实时风控引擎上线 + VaR / CVaR 计算 + 多账户管理 + 微信通知 |
-| **v0.5.0** | 生产就绪 | 纸交易模式 + Docker 部署 + PostgreSQL 迁移 + 全量测试覆盖 |
-| **v1.0.0** | 稳定发布 | A 股自动下单（合规路径）+ 策略市场 + 移动端适配 + 多用户 SaaS |
+| **v0.2.0** (已完成) | 完整回测 + 专业 UI | 回测引擎完整实现 + 7 理论全量 + 可拖拽 UI + PDF 导出 + WebSocket 增强 |
+| **v0.2.1** (当前) | TOMAS v2.0 升级 | 拓扑不变量 + 相位连续性熔断 + DNA倍发生成验证 + 全引擎相位过滤 + 工程修复 |
+| **v0.3.0** (规划中) | 多Agent协作 | 代币化AGI经济 + 多Agent并行推理 + 协调者Agent + 持续学习权重调整 |
+| **v0.4.0** | 实盘对接 | 接入真实币安 API + 通达信实时行情 + EML 知识蒸馏 + 自动交易开关 |
+| **v0.5.0** | 风控强化 | 实时风控引擎上线 + VaR / CVaR 计算 + 多账户管理 + 微信通知 |
+| **v1.0.0** | 生产就绪 | 纸交易模式 + Docker 部署 + PostgreSQL 迁移 + 全量测试覆盖 + A股自动下单 |
 
 ---
 
@@ -664,7 +691,9 @@ sequenceDiagram
 |------|------|
 | [docs/PAPER.md](docs/PAPER.md) | Phase 1 学术论文 — 鲁兆理论 + TOMAS-AGI 融合架构 |
 | [docs/PAPER-phase2.md](docs/PAPER-phase2.md) | Phase 2 技术论文 — 事件驱动回测引擎 + 多理论信号融合 |
+| [docs/PAPER-tomas-v2.md](docs/PAPER-tomas-v2.md) | TOMAS v2.0 技术论文 — 拓扑不变量 + 相位连续性 + DNA倍发生成验证 |
 | [docs/IMPLEMENTATION_WHITEPAPER.md](docs/IMPLEMENTATION_WHITEPAPER.md) | 系统实现白皮书 — 全栈工程实现详解 |
+| [docs/PHASE3_PLANNING.md](docs/PHASE3_PLANNING.md) | Phase 3 规划 — 多Agent协作交易机制 |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Phase 1 系统架构设计 |
 | [docs/ARCHITECTURE-phase2.md](docs/ARCHITECTURE-phase2.md) | Phase 2 系统架构设计 |
 | [docs/API_DOCUMENTATION.md](docs/API_DOCUMENTATION.md) | REST API + WebSocket 接口文档 |

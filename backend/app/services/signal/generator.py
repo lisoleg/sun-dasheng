@@ -10,105 +10,13 @@ import asyncio
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Protocol
+from typing import Any, Dict, List, Optional
 
 from loguru import logger
 
+from app.services.signal.base import SignalHint, TheoryResult, Signal, TheoryEngine
 from app.services.signal.fusion import SignalFusion
 from app.services.tomas.token_bridge import TomasBridge, TomasResult
-
-
-@dataclass
-class SignalHint:
-    """理论引擎的信号提示"""
-
-    direction: str = "HOLD"  # LONG / SHORT / HOLD
-    confidence: float = 0.0
-    reason: str = ""
-    price_target: Optional[float] = None
-
-    def to_dict(self) -> Dict[str, Any]:
-        """转换为字典"""
-        return {
-            "direction": self.direction,
-            "confidence": self.confidence,
-            "reason": self.reason,
-            "price_target": self.price_target,
-        }
-
-
-@dataclass
-class TheoryResult:
-    """理论引擎分析结果"""
-
-    theory_name: str = ""
-    timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
-    annotations: Dict[str, Any] = field(default_factory=dict)
-    hints: List[SignalHint] = field(default_factory=list)
-    confidence: float = 0.0
-    error: Optional[str] = None
-
-    def to_dict(self) -> Dict[str, Any]:
-        """转换为字典"""
-        return {
-            "theory_name": self.theory_name,
-            "timestamp": self.timestamp,
-            "annotations": self.annotations,
-            "hints": [h.to_dict() for h in self.hints],
-            "confidence": self.confidence,
-            "error": self.error,
-        }
-
-
-@dataclass
-class Signal:
-    """交易信号"""
-
-    signal_id: str = field(default_factory=lambda: f"sig-{uuid.uuid4().hex[:8]}")
-    symbol: str = ""
-    market: str = "crypto"
-    direction: str = "HOLD"  # LONG / SHORT / HOLD
-    price: float = 0.0
-    confidence: float = 0.0
-    source_engine: str = ""  # taiji/spiral/elliott/tomas/fusion
-    theory_name: str = ""
-    timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
-    metadata: Dict[str, Any] = field(default_factory=dict)
-
-    def to_dict(self) -> Dict[str, Any]:
-        """转换为字典"""
-        return {
-            "signal_id": self.signal_id,
-            "symbol": self.symbol,
-            "market": self.market,
-            "direction": self.direction,
-            "price": self.price,
-            "confidence": self.confidence,
-            "source_engine": self.source_engine,
-            "theory_name": self.theory_name,
-            "timestamp": self.timestamp,
-            "metadata": self.metadata,
-        }
-
-
-class TheoryEngine(Protocol):
-    """理论引擎协议（Protocol-based接口）
-
-    所有理论引擎需实现此协议，提供analyze方法。
-    """
-
-    name: str
-
-    async def analyze(self, bars: List[Dict[str, Any]]) -> TheoryResult:
-        """分析K线数据，返回理论结果
-
-        Args:
-            bars: K线数据列表
-
-        Returns:
-            TheoryResult: 理论分析结果
-        """
-        ...
 
 
 class SignalGenerator:
@@ -116,13 +24,8 @@ class SignalGenerator:
 
     编排理论引擎和TOMAS-AGI的运行流程：
     1. 并行运行所有注册的理论引擎
-    2. 汇总理论结果，咨询TOMAS-AGI
+    2. 汇总理论结果，咨询TOMAS推理
     3. 通过信号融合器生成最终信号
-
-    流程：
-    bars → [TaijiEngine, SpiralEngine, ElliottWaveEngine] → theory_results[]
-    theory_results → TomasBridge.reason() → tomas_result
-    (theory_results, tomas_result) → SignalFusion.fuse() → signals[]
     """
 
     def __init__(
@@ -183,11 +86,11 @@ class SignalGenerator:
         logger.info(f"SignalGenerator: generating signals for {len(bars)} bars")
 
         # 步骤1：并行运行所有理论引擎
-        theory_results = await self.run_theories(bars)
+        theory_results = await self._run_theories(bars)
         logger.info(f"SignalGenerator: {len(theory_results)} theory results collected")
 
         # 步骤2：咨询TOMAS-AGI
-        tomas_result = await self.consult_tomas(theory_results, bars)
+        tomas_result = await self._consult_tomas(theory_results, bars)
         logger.info(
             f"SignalGenerator: TOMAS result - source={tomas_result.source}, "
             f"confidence={tomas_result.confidence:.4f}"
@@ -206,7 +109,7 @@ class SignalGenerator:
         logger.info(f"SignalGenerator: generated {len(signals)} signals")
         return signals
 
-    async def run_theories(self, bars: List[Dict[str, Any]]) -> List[TheoryResult]:
+    async def _run_theories(self, bars: List[Dict[str, Any]]) -> List[TheoryResult]:
         """并行运行所有理论引擎
 
         单个引擎异常不影响其他引擎，捕获异常后返回空TheoryResult。
@@ -234,88 +137,29 @@ class SignalGenerator:
     ) -> Optional[TheoryResult]:
         """安全运行单个理论引擎，捕获异常
 
-        兼容两种引擎接口：
-        - 异步引擎：await engine.analyze(bars) -> TheoryResult
-        - 同步引擎：engine.analyze(bars) -> theory.base.TheoryResult
-
-        将theory.base.TheoryResult自动转换为信号层TheoryResult格式。
-
         Args:
             engine: 理论引擎实例
             bars: K线数据
 
         Returns:
-            Optional[TheoryResult]: 分析结果，异常时返回带error标记的结果
+            Optional[TheoryResult]: 分析结果，异常时返回None
         """
         try:
-            # 尝试异步调用
-            raw_result = engine.analyze(bars)
-            if hasattr(raw_result, "__await__"):
-                raw_result = await raw_result
-
-            # 转换为信号层TheoryResult格式
-            result = self._adapt_theory_result(raw_result)
+            result = engine.analyze(bars)
+            if hasattr(result, "__await__"):
+                result = await result
             logger.debug(f"Engine '{engine.name}' completed: confidence={result.confidence:.4f}")
             return result
         except Exception as e:
             logger.error(f"Engine '{engine.name}' failed: {e}")
-            return TheoryResult(
-                theory_name=getattr(engine, "name", "unknown"),
-                confidence=0.0,
-                error=str(e),
-            )
+            return None
 
-    @staticmethod
-    def _adapt_theory_result(raw_result: Any) -> TheoryResult:
-        """将理论引擎原始结果转换为信号层TheoryResult
-
-        兼容theory.base.TheoryResult（hints为List[Dict]）
-        和信号层TheoryResult（hints为List[SignalHint]）。
-
-        Args:
-            raw_result: 原始理论结果
-
-        Returns:
-            TheoryResult: 信号层格式结果
-        """
-        # 如果已经是本模块的TheoryResult，直接返回
-        if isinstance(raw_result, TheoryResult):
-            return raw_result
-
-        # 从theory.base.TheoryResult转换
-        theory_name = getattr(raw_result, "theory_name", "unknown")
-        timestamp = getattr(raw_result, "timestamp", datetime.now(timezone.utc).isoformat())
-        annotations = getattr(raw_result, "annotations", {})
-        raw_hints = getattr(raw_result, "hints", [])
-        confidence = getattr(raw_result, "confidence", 0.0)
-
-        # 转换hints：Dict -> SignalHint
-        adapted_hints: List[SignalHint] = []
-        for hint in raw_hints:
-            if isinstance(hint, SignalHint):
-                adapted_hints.append(hint)
-            elif isinstance(hint, dict):
-                adapted_hints.append(SignalHint(
-                    direction=hint.get("direction", "HOLD"),
-                    confidence=hint.get("confidence", 0.0),
-                    reason=hint.get("reason", ""),
-                    price_target=hint.get("price_target"),
-                ))
-
-        return TheoryResult(
-            theory_name=theory_name,
-            timestamp=timestamp,
-            annotations=annotations if isinstance(annotations, dict) else {},
-            hints=adapted_hints,
-            confidence=confidence,
-        )
-
-    async def consult_tomas(
+    async def _consult_tomas(
         self,
         results: List[TheoryResult],
         bars: Optional[List[Dict[str, Any]]] = None,
     ) -> TomasResult:
-        """将理论结果交给TOMAS-AGI推理
+        """将理论结果交给TOMAS推理
 
         Args:
             results: 理论引擎结果列表
@@ -358,11 +202,11 @@ class SignalGenerator:
         parts: List[str] = ["基于以下理论分析结果，请综合判断交易方向："]
         for result in results:
             if result.error:
-                parts.append(f"- {result.theory_name}：计算异常({result.error})")
+                parts.append(f"- {result.theory_name}：计算异常（{result.error}）")
             else:
                 hint_dirs = [h.direction for h in result.hints] if result.hints else ["HOLD"]
                 parts.append(
-                    f"- {result.theory_name}：方向={hint_dirs}，置信度={result.confidence:.2%}"
+                    f"- {result.theory_name}：方向={hint_dirs}, 置信度={result.confidence:.2%}"
                 )
 
         parts.append("请给出综合判断。")

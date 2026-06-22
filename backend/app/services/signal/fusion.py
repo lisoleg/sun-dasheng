@@ -29,7 +29,7 @@ from app.services.signal.fusion_strategies import (
     OrFusionStrategy,
     create_fusion_strategy,
 )
-from app.services.signal.generator import Signal, SignalHint, TheoryResult
+from app.services.signal.base import Signal, SignalHint, TheoryResult
 from app.services.tomas.token_bridge import TomasResult
 
 

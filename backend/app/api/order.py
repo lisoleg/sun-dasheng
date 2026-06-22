@@ -10,7 +10,7 @@ from sqlalchemy import select, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-from app.database import async_session
+from app.database import async_session_factory
 from app.models.order import Order
 from app.schemas.order import OrderCreate
 from app.services.execution.binance_trader import BinanceTrader, OrderResult
@@ -162,7 +162,7 @@ async def get_orders(
 ) -> Dict[str, Any]:
     """获取订单列表（从数据库查询）"""
     try:
-        async with async_session() as session:
+        async with async_session_factory() as session:
             # 构建查询
             stmt = select(Order).order_by(desc(Order.created_at))
 
@@ -228,7 +228,7 @@ async def get_orders(
 async def get_order(order_id: str) -> Dict[str, Any]:
     """获取订单详情（从数据库查询）"""
     try:
-        async with async_session() as session:
+        async with async_session_factory() as session:
             stmt = select(Order).where(Order.order_id == order_id)
             result = await session.execute(stmt)
             order = result.scalar_one_or_none()
@@ -270,7 +270,7 @@ async def cancel_order(order_id: str) -> Dict[str, Any]:
     """取消订单"""
     try:
         # 先从数据库查询订单
-        async with async_session() as session:
+        async with async_session_factory() as session:
             stmt = select(Order).where(Order.order_id == order_id)
             result = await session.execute(stmt)
             db_order = result.scalar_one_or_none()

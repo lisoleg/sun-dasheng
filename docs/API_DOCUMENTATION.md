@@ -1,8 +1,8 @@
 # 孙大圣量化交易系统 — API 文档
 
-> 版本：v0.2.0 | 更新：2026-06-17 | 状态：Phase 2 MVP
+> 版本：v0.2.1 | 更新：2026-06-23 | 状态：TOMAS v2.0
 
-Base URL：`http://localhost:8000/api`（开发环境）
+Base URL：`http://localhost:8000/api/v1`（开发环境）
 
 ---
 
@@ -16,8 +16,9 @@ Base URL：`http://localhost:8000/api`（开发环境）
 6. [策略 API](#6-策略-api)
 7. [回测 API](#7-回测-api)
 8. [用户偏好 API](#8-用户偏好-api)
-9. [WebSocket API](#9-websocket-api)
-10. [错误码表](#10-错误码表)
+9. [TOMAS v2.0 API](#9-tomas-v20-api) 🆕
+10. [WebSocket API](#10-websocket-api)
+11. [错误码表](#11-错误码表)
 
 ---
 
@@ -59,7 +60,7 @@ Base URL：`http://localhost:8000/api`（开发环境）
 
 ## 2. 行情 API
 
-Base Path：`/api/market`
+Base Path：`/api/v1/market`
 
 ### 2.1 获取 K 线数据
 
@@ -139,9 +140,107 @@ GET /api/market/symbols
 
 ---
 
+### 2.3 相位连续性分析（TOMAS v2.0 新增）
+
+```
+GET /api/v1/market/phase-analysis
+```
+
+**Query 参数：**
+
+| 参数 | 类型 | 必填 | 默认值 | 说明 |
+|--------|------|------|--------|------|
+| symbol | string | 否 | `BTCUSDT` | 标的代码 |
+| timeframe | string | 否 | `1d` | 时间周期 |
+| limit | int | 否 | `100` | K线数量（30-1000） |
+
+**响应示例：**
+
+```json
+{
+  "code": 0,
+  "data": {
+    "symbol": "BTCUSDT",
+    "timeframe": "1d",
+    "pcs": 0.8234,
+    "regime": "phase_continuous",
+    "action": "normal",
+    "taiji_idx": 45,
+    "singularity": false,
+    "lob_depth": 0.7821
+  },
+  "message": "ok"
+}
+```
+
+**字段说明：**
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| pcs | float | 相位连续性评分 [0, 1] |
+| regime | string | 市场状态：`phase_continuous` / `transition` / `phase_singularity` |
+| action | string | 建议操作：`normal` / `caution` / `circuit_break` |
+| taiji_idx | int | 太极中心索引（当前窗口内最具结构意义的K线位置） |
+| singularity | bool | 是否处于相位奇点 |
+| lob_depth | float | LOB 深度熵（归一化） |
+
+---
+
+### 2.4 DNA 倍发生成验证（TOMAS v2.0 新增）
+
+```
+GET /api/v1/market/dna-detection
+```
+
+**Query 参数：**
+
+| 参数 | 类型 | 必填 | 默认值 | 说明 |
+|--------|------|------|--------|------|
+| symbol | string | 否 | `BTCUSDT` | 标的代码 |
+| timeframe | string | 否 | `1d` | 时间周期 |
+| limit | int | 否 | `200` | K线数量（50-1000，需足够多为DNA检测） |
+
+**响应示例：**
+
+```json
+{
+  "code": 0,
+  "data": {
+    "symbol": "BTCUSDT",
+    "timeframe": "1d",
+    "dna": {
+      "first_wave_duration": 13,
+      "first_wave_amplitude": 15.23,
+      "direction": "up",
+      "start_idx": 10,
+      "end_idx": 23
+    },
+    "wave_count": 7,
+    "ksnap_verify": {
+      "kappa": 0.72,
+      "is_extrapolatable": true,
+      "confidence": 0.68,
+      "predicted_next_duration": 21,
+      "predicted_next_amplitude": 24.6
+    }
+  },
+  "message": "ok"
+}
+```
+
+**错误码：**
+
+| code | 说明 |
+|------|------|
+| 2003 | 波浪不足（需要≥3浪） |
+| 2004 | DNA基因提取失败 |
+| 2005 | DNA检测失败（内部错误） |
+
+---
+
 ## 3. 信号 API
 
-Base Path：`/api/signals`
+Base Path：`/api/v1/signals`
 
 ### 3.1 获取信号列表（分页）
 
@@ -243,7 +342,7 @@ POST /api/signals/generate?symbol=BTCUSDT&timeframe=1d&limit=200
 
 ## 4. 订单 API
 
-Base Path：`/api/orders`
+Base Path：`/api/v1/orders`
 
 ### 4.1 创建订单（手动下单）
 
@@ -336,7 +435,7 @@ DELETE /api/orders/{order_id}
 
 ## 5. 风控 API
 
-Base Path：`/api/risk`
+Base Path：`/api/v1/risk`
 
 ### 5.1 获取风控配置
 
@@ -428,7 +527,7 @@ GET /api/risk/alerts
 
 ## 6. 策略 API
 
-Base Path：`/api/strategy`
+Base Path：`/api/v1/strategy`
 
 ### 6.1 获取理论引擎列表
 
@@ -498,7 +597,7 @@ POST /api/strategy/eml/distill
 
 ## 7. 回测 API 🆕（Phase 2 新增）
 
-Base Path：`/api/backtest`
+Base Path：`/api/v1/backtest`
 
 ### 7.1 启动回测
 
@@ -705,7 +804,7 @@ GET /api/backtest/scan/{scan_id}
 
 ## 8. 用户偏好 API 🆕（Phase 2 新增）
 
-Base Path：`/api/preferences`
+Base Path：`/api/v1/preferences`
 
 ### 8.1 获取用户偏好
 

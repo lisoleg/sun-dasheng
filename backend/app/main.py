@@ -156,7 +156,7 @@ app.add_middleware(
 )
 
 # 注册API路由
-app.include_router(api_router, prefix="/api")
+app.include_router(api_router, prefix="/api/v1")
 
 
 @app.get("/health", tags=["系统"])

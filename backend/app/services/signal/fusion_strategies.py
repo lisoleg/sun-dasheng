@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Optional
 
 from loguru import logger
 
-from app.services.signal.generator import Signal, SignalHint, TheoryResult
+from app.services.signal.base import Signal, SignalHint, TheoryResult
 
 
 @dataclass

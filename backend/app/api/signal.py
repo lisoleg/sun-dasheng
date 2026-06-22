@@ -9,7 +9,7 @@ from loguru import logger
 from sqlalchemy import select, desc, asc
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import async_session
+from app.database import async_session_factory
 from app.models.signal import Signal
 from app.services.signal.generator import SignalGenerator
 from app.services.tomas.token_bridge import TomasBridge
@@ -60,7 +60,7 @@ async def get_signals(
 ) -> Dict[str, Any]:
     """获取信号列表（分页，从数据库查询真实信号）"""
     try:
-        async with async_session() as session:
+        async with async_session_factory() as session:
             # 构建查询
             stmt = select(Signal).order_by(desc(Signal.timestamp))
 
@@ -107,7 +107,7 @@ async def get_signals(
                     "theory_name": s.theory_name,
                     "timestamp": s.timestamp.isoformat(),
                     "created_at": s.created_at.isoformat(),
-                    "metadata": s.metadata or {},
+                    "metadata": s.meta_data or {},
                 }
                 for s in signals
             ]
@@ -137,7 +137,7 @@ async def get_latest_signals(
 ) -> Dict[str, Any]:
     """获取最新信号（从数据库查询）"""
     try:
-        async with async_session() as session:
+        async with async_session_factory() as session:
             stmt = (
                 select(Signal)
                 .order_by(desc(Signal.timestamp))
@@ -223,7 +223,7 @@ async def generate_signals(
 
         # 保存到数据库
         saved_count = 0
-        async with async_session() as session:
+        async with async_session_factory() as session:
             for sig in signals:
                 signal_model = Signal(
                     signal_id=sig.get("signal_id", f"sig-{datetime.now().strftime('%Y%m%d%H%M%S')}"),
@@ -236,7 +236,7 @@ async def generate_signals(
                     theory_name=sig.get("theory_name", ""),
                     timestamp=datetime.now(timezone.utc),
                     created_at=datetime.now(timezone.utc),
-                    metadata=sig.get("metadata", {}),
+                    meta_data=sig.get("metadata", {}),
                 )
                 session.add(signal_model)
                 saved_count += 1

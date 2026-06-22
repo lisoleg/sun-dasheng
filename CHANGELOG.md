@@ -6,6 +6,47 @@
 
 ---
 
+## [0.2.1] — 2026-06-23
+
+### 新增
+- 拓扑不变量库（`topo_invariants.py`）：鲁加斯数列、八卦常数、`apply_phase_filter()` 通用相位过滤函数
+- 相位连续性分析器（`phase_analyzer.py`）：LOB 深度熵计算、PCS 评分、三档熔断机制、ENPV 决策
+- DNA 倍发生成验证（`dna_replication.py`）：波浪检测、DNA 基因提取、斐波那契/鲁加斯自相似验证、κ-Snap 外推推理
+- 信号基类模块（`signal/base.py`）：提取 SignalHint/TheoryResult/Signal/TheoryEngine 解决循环导入
+- 2 个 TOMAS v2.0 API 端点：`/market/phase-analysis` 和 `/market/dna-detection`
+- PhaseAnalysisPage 前端图表增强：PCS 历史走势线图 + PCS/价格双 Y 轴叠加图
+- DNADetectionPage 前端图表增强：波浪结构可视化（面积图 + 菱形标记 + 虚线边界）
+- Phase 3 规划文档（`docs/PHASE3_PLANNING.md`）：多 Agent 协作交易机制
+- TOMAS v2.0 技术论文（`docs/PAPER-tomas-v2.md`）
+
+### 修改
+- 全部 7 个理论引擎 `analyze()` 方法末尾统一接入 `apply_phase_filter()` 相位连续性过滤
+- 信号融合 WEIGHTED 策略增加全局相位连续性门控
+- 回测滑点模型升级：滑点 = 相位失配成本（TOMAS v2.0 核心概念）
+- 回测信号执行器增加流动性熔断 + ENPV 决策逻辑
+- TheoryResult 数据结构新增 `phase_continuity` 和 `is_phase_valid` 字段
+- `generator.py` 重构：移除内联类定义，从 `base.py` 导入
+- `fusion.py` 和 `fusion_strategies.py` 导入路径从 `generator` 改为 `base`
+- `signal.py` 和 `order.py`：`async_session` → `async_session_factory`，`metadata` → `meta_data`
+- Signal 模型：`metadata` 字段重命名为 `meta_data`（保留 DB 列名 `metadata`）
+- `main.py` 路由前缀从 `/api` 改为 `/api/v1`
+- `requirements.txt`：注释掉 TA-Lib（无 C 编译器），清理重复依赖
+- 前端 `postcss.config.js` 重命名为 `postcss.config.cjs`（ES module 兼容）
+
+### 修复
+- 信号模块循环导入：`generator.py` ↔ `fusion.py` ↔ `fusion_strategies.py` 三角依赖
+- SQLAlchemy 保留属性名冲突：`metadata` 是 SQLAlchemy 保留字，改为 `meta_data`
+- `async_session` 导入错误：`app.database` 导出的是 `async_session_factory`
+- numpy 1.26 无 Python 3.13 预编译 wheel：降级至 Python 3.10
+- 前端 Vite 启动失败：`postcss.config.js` 与 `"type": "module"` 冲突
+
+### 已知问题
+- 币安测试网连接超时（网络环境问题，非代码Bug）
+- TA-Lib 未安装（需 C 编译器，当前未在代码中使用）
+- Redis 未运行时 Celery 任务不可用
+
+---
+
 ## [0.2.0] — 2026-06-21
 
 ### 新增
