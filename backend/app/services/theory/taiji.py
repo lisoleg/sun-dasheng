@@ -67,6 +67,27 @@ class TaijiEngine(TheoryEngine):
         # 计算整体置信度
         confidence = self._calc_confidence(bars, taiji_centers, dna29_windows, dna13_windows)
 
+        # [TOMAS v2.0] 相位连续性过滤
+        from app.core.topo_invariants import phase_continuity_score, detect_phase_singularity
+        import numpy as np
+        
+        closes = np.array([float(bar.get("close", 0)) for bar in bars])
+        pcs = phase_continuity_score(closes, window=30)
+        singularity = detect_phase_singularity(closes)
+        
+        # 根据相位连续性调整信号
+        if pcs < 0.3 or singularity.get("is_singularity", False):
+            # 相变奇点区：清空信号，强制熔断
+            hints = []
+            confidence = confidence * 0.1  # 大幅降低置信度
+            logger.warning(f"Phase singularity detected: PCS={pcs:.3f}, clearing all hints")
+        elif pcs < 0.7:
+            # 过渡区：降低置信度
+            confidence = confidence * 0.5
+            for hint in hints:
+                hint["confidence"] *= 0.5
+            logger.info(f"Phase transition zone: PCS={pcs:.3f}, reducing confidence")
+        
         return TheoryResult(
             theory_name=self.name,
             timestamp=datetime.now(timezone.utc).isoformat(),
@@ -74,9 +95,13 @@ class TaijiEngine(TheoryEngine):
                 "taiji_centers": taiji_centers,
                 "dna29_windows": dna29_windows,
                 "dna13_windows": dna13_windows,
+                "phase_continuity_score": pcs,
+                "is_phase_singularity": singularity.get("is_singularity", False),
             },
             hints=hints,
             confidence=confidence,
+            phase_continuity=pcs,
+            is_phase_valid=pcs >= 0.7,
         )
 
     def get_annotations(self, bars: List[Dict]) -> List[Dict]:

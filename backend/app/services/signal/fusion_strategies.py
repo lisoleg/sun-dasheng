@@ -284,10 +284,28 @@ class WeightedFusionStrategy(FusionStrategy):
             best_direction = max(direction_scores, key=direction_scores.get)
             best_score = direction_scores[best_direction]
 
+            # [TOMAS v2.0] 相位连续性过滤
+            # 计算平均相位连续性评分
+            phase_scores = [
+                r.phase_continuity for r in theory_results 
+                if hasattr(r, 'phase_continuity')
+            ]
+            avg_phase = sum(phase_scores) / len(phase_scores) if phase_scores else 1.0
+            
+            # 相变奇点区：不输出信号
+            if avg_phase < 0.3:
+                logger.warning(f"Phase singularity: avg_PCS={avg_phase:.3f}, skipping fusion")
+                continue
+            
+            # 过渡区：降低置信度
+            if avg_phase < 0.7:
+                best_score = best_score * (0.5 + 0.5 * (avg_phase / 0.7))
+                logger.info(f"Phase transition: avg_PCS={avg_phase:.3f}, reducing confidence")
+            
             # 仅输出置信度超过阈值的信号
             if best_score < 0.3:
                 continue
-
+            
             fused_signal = Signal(
                 signal_id=f"sig-weighted-{symbol}",
                 symbol=symbol,
@@ -299,6 +317,7 @@ class WeightedFusionStrategy(FusionStrategy):
                     "strategy": "weighted",
                     "direction_scores": direction_scores,
                     "contributors": direction_contributors.get(best_direction, []),
+                    "phase_continuity": avg_phase,  # [TOMAS v2.0] 记录相位评分
                 },
             )
 

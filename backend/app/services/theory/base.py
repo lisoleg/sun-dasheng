@@ -15,6 +15,8 @@ class TheoryResult:
         annotations: 标注信息字典，用于图表绘制
         hints: 信号提示列表，每个hint包含类型、方向、置信度等
         confidence: 整体置信度 0.0-1.0
+        phase_continuity: 相位连续性评分 [0, 1]（TOMAS v2.0 新增）
+        is_phase_valid: 相位是否有效（PCS >= 0.7）（TOMAS v2.0 新增）
     """
 
     theory_name: str
@@ -22,6 +24,8 @@ class TheoryResult:
     annotations: Dict[str, Any] = field(default_factory=dict)
     hints: List[Dict[str, Any]] = field(default_factory=list)
     confidence: float = 0.0
+    phase_continuity: float = 1.0  # 默认相位连续
+    is_phase_valid: bool = True     # 默认相位有效
 
 
 class TheoryEngine(ABC):
