@@ -16,6 +16,7 @@ from loguru import logger
 
 from app.services.theory.base import TheoryEngine, TheoryResult
 from app.core.topo_invariants import apply_phase_filter
+from app.core.cosmic_algorithm import apply_369_signal_filter
 
 # ZigZag阈值用于识别极值点
 ZIGZAG_THRESHOLD = 0.03  # 3%用于波浪识别（比太极中心律更敏感）
@@ -78,6 +79,11 @@ class ElliottWaveEngine(TheoryEngine):
             hints, confidence, bars, log_prefix=self.name
         )
 
+        # [宇宙算法] 369振动模态过滤（双重过滤）
+        hints, confidence, vibration_score, mode_details = apply_369_signal_filter(
+            hints, confidence, bars, log_prefix=self.name
+        )
+
         return TheoryResult(
             theory_name=self.name,
             timestamp=datetime.now(timezone.utc).isoformat(),
@@ -89,6 +95,7 @@ class ElliottWaveEngine(TheoryEngine):
                 "current_wave": current_wave,
                 "phase_continuity_score": pcs,
                 "is_phase_singularity": is_sing,
+                "vibration_369": mode_details,
             },
             hints=hints,
             confidence=confidence,

@@ -22,6 +22,7 @@ import {
   ChevronRight,
   Activity,
   Dna,
+  Orbit,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -41,6 +42,8 @@ const NAV_ITEMS = [
   // TOMAS v2.0 新增
   { path: '/phase-analysis', label: '相位分析', icon: Activity },
   { path: '/dna-detection', label: 'DNA检测', icon: Dna },
+  // 宇宙算法三重奏
+  { path: '/cosmic-algorithm', label: '宇宙算法', icon: Orbit },
 ];
 
 const Sidebar: React.FC<SidebarProps> = ({ open }) => {

@@ -14,6 +14,7 @@ from loguru import logger
 
 from app.services.theory.base import TheoryEngine, TheoryResult
 from app.core.topo_invariants import apply_phase_filter
+from app.core.cosmic_algorithm import apply_369_signal_filter
 
 # BG均线周期
 BG_PERIODS = [4, 8, 16, 32]
@@ -74,6 +75,11 @@ class BGMovingAverageEngine(TheoryEngine):
             hints, confidence, bars, log_prefix=self.name
         )
 
+        # [宇宙算法] 369振动模态过滤（双重过滤）
+        hints, confidence, vibration_score, mode_details = apply_369_signal_filter(
+            hints, confidence, bars, log_prefix=self.name
+        )
+
         return TheoryResult(
             theory_name=self.name,
             timestamp=datetime.now(timezone.utc).isoformat(),
@@ -83,6 +89,7 @@ class BGMovingAverageEngine(TheoryEngine):
                 "arrangement": arrangement,
                 "phase_continuity_score": pcs,
                 "is_phase_singularity": is_sing,
+                "vibration_369": mode_details,
             },
             hints=hints,
             confidence=confidence,

@@ -8,6 +8,7 @@ import RiskMonitorPage from '@/pages/RiskMonitorPage';
 import KnowledgePage from '@/pages/KnowledgePage';
 import PhaseAnalysisPage from '@/pages/PhaseAnalysisPage';
 import DNADetectionPage from '@/pages/DNADetectionPage';
+import CosmicAlgorithmPage from '@/pages/CosmicAlgorithmPage';
 
 // 临时占位（T15 会创建真正的 DashboardPage）
 const DashboardPage = React.lazy(() => import('@/pages/DashboardPage').catch(() => ({
@@ -39,6 +40,8 @@ const App: React.FC = () => {
           {/* TOMAS v2.0 新增 */}
           <Route path="/phase-analysis" element={<PhaseAnalysisPage />} />
           <Route path="/dna-detection" element={<DNADetectionPage />} />
+          {/* 宇宙算法三重奏 */}
+          <Route path="/cosmic-algorithm" element={<CosmicAlgorithmPage />} />
           {/* T23 设置页 */}
           <Route path="/settings" element={<div>设置页（T23 实现中）</div>} />
         </Route>

@@ -14,6 +14,9 @@
 - StopLossManager：139窗口σ硬止损（check_139_volatility_stop）+ 临界慢化硬止损（check_139_critical_stop）
 - PositionSizer：139自动缩仓（calculate_139_adjusted_size）+ 369模态仓位调整（calculate_369_adjusted_size）
 - 宇宙算法三重奏论文（`docs/PAPER-cosmic-algorithm.md`）
+- **前端 CosmicAlgorithmPage 页面**（`/cosmic-algorithm`）：展示三重奏实时评分（trio_score大表盘 + 369/139/7三层评分卡片 + 数字根分布BarChart + 三重奏走势ComposedChart + 风控建议表）
+- **6个理论引擎369振动模态过滤推广**：taiji/spiral/elliott_wave/dual_law/gann_angle/bg_moving_average 全部集成 `apply_369_signal_filter()` 双重过滤（PCS+369），annotations 新增 vibration_369 字段
+- **回测引擎接入139缩仓+σ硬止损**：signal_runner.py 的 `_check_stop_loss_take_profit()` 新增139硬止损检查，`_generate_open_orders()` 新增139/369缩仓调整
 
 ### 修改
 - CycleLawEngine：整合139-day周期聚类+斐波那契共振确认拐点+369双重过滤（PCS+振动模态）

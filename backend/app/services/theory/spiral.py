@@ -13,6 +13,7 @@ from loguru import logger
 
 from app.services.theory.base import TheoryEngine, TheoryResult
 from app.core.topo_invariants import apply_phase_filter
+from app.core.cosmic_algorithm import apply_369_signal_filter
 
 # 斐波那契回撤比例
 FIBONACCI_RETRACEMENT_LEVELS = [0.236, 0.382, 0.5, 0.618, 0.786]
@@ -78,6 +79,11 @@ class SpiralEngine(TheoryEngine):
             hints, confidence, bars, log_prefix=self.name
         )
 
+        # [宇宙算法] 369振动模态过滤（双重过滤）
+        hints, confidence, vibration_score, mode_details = apply_369_signal_filter(
+            hints, confidence, bars, log_prefix=self.name
+        )
+
         return TheoryResult(
             theory_name=self.name,
             timestamp=datetime.now(timezone.utc).isoformat(),
@@ -89,6 +95,7 @@ class SpiralEngine(TheoryEngine):
                 "spiral_points": spiral_points,
                 "phase_continuity_score": pcs,
                 "is_phase_singularity": is_sing,
+                "vibration_369": mode_details,
             },
             hints=hints,
             confidence=confidence,

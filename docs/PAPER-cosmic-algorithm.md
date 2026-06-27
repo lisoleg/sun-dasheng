@@ -14,6 +14,8 @@
 
 三重奏的核心常数——7（结构自指）、139（临界演化）、369（振动法则）——分别对应了循环群Z_7的完美闭合、Landau-Ising相变模型的临界阈值、以及模9群的动力学投影。本文详细阐述了这三个常数的数学基础及其在金融市场的工程实现。
 
+**v0.3.0 更新**：本文档新增前端 CosmicAlgorithmPage 实时展示、6个理论引擎369振动模态过滤推广、回测引擎139缩仓+σ硬止损集成。
+
 ---
 
 ## 1. 理论基础
@@ -212,9 +214,154 @@ def digital_root(n: int) -> int:
 
 ---
 
-## 4. 实验验证
+## 4. 前端实时展示
 
-### 4.1 数字根测试
+### 4.1 CosmicAlgorithmPage 设计
+
+前端新增 `CosmicAlgorithmPage` 页面（`/cosmic-algorithm`），实时展示宇宙算法三重奏评分。
+
+**页面布局**：
+1. **标题栏**：Orbit icon + "宇宙算法三重奏" + Chip "7-139-369"
+2. **搜索栏**：TextField 股票代码 + TextField 时间周期 + Button 分析
+3. **Trio Score 大表盘**（左侧 4列）：CircularProgress 大圆盘显示 trio_score，下方 Chip 显示 trio_label，三个子表盘显示 369/139/7 各层分数
+4. **三层评分卡片**（右侧 8列）：
+   - 369振动模态分数 + 模态标签 + 触发/共振/归整频率
+   - 139相变评分 + regime标签 + 方差比值 + 自相关系数 + 恢复速率
+   - 7闭合评分 + Z₇闭合标签 + 主周期 + FFT功率
+5. **369数字根分布条形图**：BarChart 展示 root_distribution (1-9)
+6. **三重奏综合走势图**：ComposedChart 展示 trio_score/vibration/critical/closure 时间序列
+7. **交易含义卡片** + 风控建议表（139缩仓/σ硬止损/波动率警告）
+8. **三层评分详情对比表**
+
+**API 调用**：`GET /api/v1/market/cosmic-algorithm?symbol=XXX&timeframe=1d&limit=200`
+
+**降级策略**：API 失败时自动使用 mock 数据，确保页面始终可用。
+
+### 4.2 导航集成
+
+前端路由注册：
+- `App.tsx`：添加 `import CosmicAlgorithmPage` + `<Route path="/cosmic-algorithm" .../>`
+- `Sidebar.tsx`：添加 Orbit icon + `{ path: '/cosmic-algorithm', label: '宇宙算法', icon: Orbit }`
+
+---
+
+## 5. 全引擎369振动模态过滤推广
+
+### 5.1 推广范围
+
+初始版本仅在 `cycle_law.py` 中集成了369振动模态过滤。v0.3.0 将 `apply_369_signal_filter()` 推广到全部7个理论引擎：
+
+| 引擎 | 文件 | 369过滤 | PCS过滤 | 双重过滤 |
+|------|------|---------|---------|---------|
+| 太极中心律 | taiji.py | ✅ | ✅ | ✅ |
+| 螺旋律 | spiral.py | ✅ | ✅ | ✅ |
+| 波浪理论 | elliott_wave.py | ✅ | ✅ | ✅ |
+| 对偶律 | dual_law.py | ✅ | ✅ | ✅ |
+| 周期律 | cycle_law.py | ✅ | ✅ | ✅ |
+| 江恩角度线 | gann_angle.py | ✅ | ✅ | ✅ |
+| BG均线 | bg_moving_average.py | ✅ | ✅ | ✅ |
+
+### 5.2 集成模式
+
+每个引擎的 `analyze()` 方法中，在 `apply_phase_filter()`（PCS相位过滤）之后，添加 `apply_369_signal_filter()` 调用：
+
+```python
+# 文件顶部添加 import
+from app.core.cosmic_algorithm import apply_369_signal_filter
+
+# 在 analyze() 方法中
+# [宇宙算法] 369振动模态过滤（双重过滤）
+hints, confidence, vibration_score, mode_details = apply_369_signal_filter(
+    hints, confidence, bars, log_prefix=self.name
+)
+
+# 在 annotations 中添加
+"vibration_369": mode_details,
+```
+
+### 5.3 过滤效果
+
+369振动模态过滤对信号质量的影响：
+- `vibration_score ≥ 0.6`：正常交易，置信度不变
+- `0.3 ≤ vibration_score < 0.6`：降低置信度至50%，谨慎交易
+- `vibration_score < 0.3`：噪音信号，清空信号列表，降低置信度至10%
+
+---
+
+## 6. 回测引擎139风控集成
+
+### 6.1 139硬止损
+
+`signal_runner.py` 的 `_check_stop_loss_take_profit()` 方法新增139窗口σ硬止损检查：
+
+```python
+# [宇宙算法] 139σ硬止损检查
+from app.services.risk.stop_loss import StopLossManager
+stop_manager = StopLossManager()
+
+# 139波动率σ硬止损
+vol_result = stop_manager.check_139_volatility_stop(
+    {"position_id": f"{symbol}-{current_bar_index}"},
+    historical_closes,
+)
+if vol_result == StopLossManager.StopCheckResult.STOP_LOSS_TRIGGERED:
+    should_close = True
+    exit_reason = "139_VOLATILITY_STOP"
+
+# 139临界慢化硬止损
+crit_result = stop_manager.check_139_critical_stop(
+    {"position_id": f"{symbol}-{current_bar_index}"},
+    bars_data,
+)
+if crit_result == StopLossManager.StopCheckResult.STOP_LOSS_TRIGGERED:
+    should_close = True
+    exit_reason = "139_CRITICAL_STOP"
+```
+
+### 6.2 139/369缩仓
+
+`signal_runner.py` 的 `_generate_open_orders()` 方法新增139/369缩仓调整：
+
+```python
+# [宇宙算法] 139缩仓 + 369缩仓
+from app.services.risk.position_sizer import PositionSizer as PositionSizerClass
+sizer = PositionSizerClass()
+
+# 139缩仓
+position_size = sizer.calculate_139_adjusted_size(
+    portfolio_manager.portfolio,
+    avg_confidence,
+    bar.close,
+    stop_price,
+    bars_data,
+)
+
+# 369缩仓（叠加）
+position_size = sizer.calculate_369_adjusted_size(
+    portfolio_manager.portfolio,
+    avg_confidence,
+    bar.close,
+    stop_price,
+    bars_data,
+)
+```
+
+### 6.3 缩仓逻辑
+
+| 市场状态 | 139缩仓 | 369缩仓 |
+|---------|---------|---------|
+| critical_slowing | ×0.5 | - |
+| transitioning | ×0.75 | - |
+| stable | ×1.0 | - |
+| strong (score≥0.6) | - | ×1.0 |
+| moderate (0.3-0.6) | - | ×0.75 |
+| noise (score<0.3) | - | ×0.25 |
+
+---
+
+## 7. 实验验证
+
+### 7.1 数字根测试
 
 | 输入 | 数字根 | 验证 |
 |------|-------|------|
@@ -223,27 +370,27 @@ def digital_root(n: int) -> int:
 | 139 | 4 | ✅ (1+3+9=13→1+3=4) |
 | 0 | 9 | ✅ (Z_9特殊映射) |
 
-### 4.2 139相变检测
+### 7.2 139相变检测
 
 | 序列类型 | variance_ratio | autocorrelation | recovery_rate | critical_score | regime |
 |---------|---------------|----------------|--------------|---------------|--------|
 | 稳态序列 | 1.01 | -0.076 | 0.966 | 1.0 | transitioning |
 | 临界序列 | 1.05 | 0.779 | 5.528 | 2.0 | critical_slowing |
 
-### 4.3 7循环群检测
+### 7.3 7循环群检测
 
 | 序列类型 | has_7_cycle | closure_score | dominant_period |
 |---------|------------|---------------|----------------|
 | 含7周期 | true | 0.482 | 7 |
 | 随机序列 | false | 0.066 | 3 |
 
-### 4.4 三重奏综合评分
+### 7.4 三重奏综合评分
 
 含7周期的序列综合评分 = 0.395（moderate），表明三重奏可以有效区分市场状态。
 
 ---
 
-## 5. 与TOMAS v2.0的关系
+## 8. 与TOMAS v2.0的关系
 
 宇宙算法三重奏与 TOMAS v2.0 构成互补体系：
 
@@ -258,7 +405,7 @@ def digital_root(n: int) -> int:
 
 ---
 
-## 6. 结论与展望
+## 9. 结论与展望
 
 宇宙算法三重奏（7-139-369）为孙大圣量化交易系统提供了一个基于数论和复杂系统理论的新型过滤框架。三个核心常数——7（结构自指）、139（临界演化）、369（振动法则）——从不同维度约束信号质量，形成了"只交易符合数学规律的市场行为"的核心理念。
 
@@ -266,7 +413,7 @@ def digital_root(n: int) -> int:
 1. 在真实市场数据上验证139临界慢化征兆的预测有效性
 2. 将369振动模态应用于高频数据（分钟级），探索微观结构振动模式
 3. 7循环群检测扩展为多尺度周期检测（Z_7、Z_12、Z_60等）
-4. 将三重奏评分接入前端实时显示，增强用户决策体验
+4. ~~将三重奏评分接入前端实时显示，增强用户决策体验~~ ✅ 已完成（CosmicAlgorithmPage）
 
 ---
 

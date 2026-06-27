@@ -13,6 +13,7 @@ from typing import Any, Dict, List
 from loguru import logger
 
 from app.services.theory.base import TheoryEngine, TheoryResult
+from app.core.cosmic_algorithm import apply_369_signal_filter
 
 # DNA主宰数字常量
 DNA_29 = 29  # 主宰数字29，鲁兆理论中的核心周期
@@ -88,6 +89,11 @@ class TaijiEngine(TheoryEngine):
                 hint["confidence"] *= 0.5
             logger.info(f"Phase transition zone: PCS={pcs:.3f}, reducing confidence")
         
+        # [宇宙算法] 369振动模态过滤（双重过滤）
+        hints, confidence, vibration_score, mode_details = apply_369_signal_filter(
+            hints, confidence, bars, log_prefix=self.name
+        )
+        
         return TheoryResult(
             theory_name=self.name,
             timestamp=datetime.now(timezone.utc).isoformat(),
@@ -97,6 +103,7 @@ class TaijiEngine(TheoryEngine):
                 "dna13_windows": dna13_windows,
                 "phase_continuity_score": pcs,
                 "is_phase_singularity": singularity.get("is_singularity", False),
+                "vibration_369": mode_details,
             },
             hints=hints,
             confidence=confidence,

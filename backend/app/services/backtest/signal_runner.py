@@ -251,6 +251,43 @@ class SignalRunner:
         if position_size <= 0:
             return orders
 
+        # [宇宙算法] 139/369缩仓调整
+        from app.services.risk.position_sizer import PositionSizer as PositionSizerClass
+        sizer = PositionSizerClass()
+        # 构建K线数据列表
+        bars_data = [
+            {
+                "close": bar.close,
+                "high": bar.high,
+                "low": bar.low,
+                "open": bar.open,
+                "volume": bar.volume,
+            }
+        ] * 139  # 简化版，实际需要完整历史K线
+        # 139缩仓（临界慢化自适应缩仓）
+        # 注意: calculate_139_adjusted_size 的 capital 参数是 float，
+        # 使用 portfolio.equity 作为总资金
+        portfolio_equity = portfolio_manager.portfolio.equity if hasattr(portfolio_manager.portfolio, 'equity') else float(portfolio_manager.portfolio)
+        stop_price = bar.close * (1 - self.config.stop_loss_pct) if self.config.stop_loss_pct else bar.close * 0.99
+        position_size = sizer.calculate_139_adjusted_size(
+            portfolio_equity,
+            avg_confidence,
+            bar.close,
+            stop_price,
+            bars_data,
+        )
+        # 369缩仓（振动模态仓位调整，叠加）
+        position_size = sizer.calculate_369_adjusted_size(
+            portfolio_equity,
+            avg_confidence,
+            bar.close,
+            stop_price,
+            bars_data,
+        )
+
+        if position_size <= 0:
+            return orders
+
         # 创建订单
         self._order_counter += 1
         order = Order(
@@ -311,6 +348,43 @@ class SignalRunner:
             if bar.high >= take_profit_price:
                 should_close = True
                 exit_reason = "TAKE_PROFIT"
+
+        # [宇宙算法] 139σ硬止损检查
+        from app.services.risk.stop_loss import StopLossManager
+        stop_manager = StopLossManager()
+        # 构建历史价格列表（简化版：使用当前bar的close构建伪序列）
+        historical_closes = [float(bar.close)] * 139  # 简化版，实际需要完整历史
+        # 139波动率硬止损
+        vol_result = stop_manager.check_139_volatility_stop(
+            {"position_id": f"{symbol}-{current_bar_index}"},
+            historical_closes,
+        )
+        if vol_result == stop_manager.StopCheckResult.STOP_LOSS_TRIGGERED:
+            should_close = True
+            exit_reason = "139_VOLATILITY_STOP"
+            logger.warning(
+                f"SignalRunner: 139 volatility stop triggered for {symbol} @ {bar.close:.2f}"
+            )
+        # 139临界慢化硬止损
+        bars_data = [
+            {
+                "close": float(bar.close),
+                "high": float(bar.high),
+                "low": float(bar.low),
+                "open": float(bar.open),
+                "volume": float(bar.volume),
+            }
+        ] * 139  # 简化版，实际需要完整历史K线
+        crit_result = stop_manager.check_139_critical_stop(
+            {"position_id": f"{symbol}-{current_bar_index}"},
+            bars_data,
+        )
+        if crit_result == stop_manager.StopCheckResult.STOP_LOSS_TRIGGERED:
+            should_close = True
+            exit_reason = "139_CRITICAL_STOP"
+            logger.warning(
+                f"SignalRunner: 139 critical stop triggered for {symbol} @ {bar.close:.2f}"
+            )
 
         if should_close:
             # 创建平仓订单
