@@ -236,6 +236,79 @@ GET /api/v1/market/dna-detection
 | 2004 | DNA基因提取失败 |
 | 2005 | DNA检测失败（内部错误） |
 
+### 2.5 宇宙算法三重奏（7-139-369）
+
+```
+GET /api/v1/market/cosmic-algorithm
+```
+
+**Query 参数：**
+
+| 参数 | 类型 | 必填 | 默认值 | 说明 |
+|--------|------|------|--------|------|
+| symbol | string | 否 | `BTCUSDT` | 标的代码 |
+| timeframe | string | 否 | `1d` | 时间周期 |
+| limit | int | 否 | `200` | K线数量（50-1000） |
+
+**响应示例：**
+
+```json
+{
+  "code": 0,
+  "data": {
+    "symbol": "BTCUSDT",
+    "timeframe": "1d",
+    "trio_score": 0.395,
+    "trio_label": "moderate",
+    "trading_implication": "部分共振，需谨慎，建议降低仓位或等待确认",
+    "risk_control": {
+      "should_reduce_position": true,
+      "should_hard_stop": false,
+      "volatility_warning": false
+    },
+    "vibration_369": {
+      "vibration_score": 0.368,
+      "trigger_freq": 0.158,
+      "resonance_freq": 0.053,
+      "closure_freq": 0.158,
+      "mode_label": "moderate"
+    },
+    "critical_139": {
+      "is_critical": true,
+      "variance_ratio": 1.05,
+      "autocorrelation": 0.779,
+      "recovery_rate": 5.528,
+      "critical_score": 2.0,
+      "regime": "critical_slowing"
+    },
+    "cycle_7": {
+      "has_7_cycle": true,
+      "closure_score": 0.482,
+      "dominant_period": 7,
+      "fft_power_at_7": 0.0062
+    }
+  },
+  "message": "ok"
+}
+```
+
+**字段含义：**
+
+| 字段 | 说明 |
+|------|------|
+| trio_score | 三重奏综合评分 [0,1]，≥0.6=强 / 0.3-0.6=中等 / <0.3=弱 |
+| vibration_369.vibration_score | 369振动模态分数：触发(3)+共振(6)+归整(9)/总频率 |
+| critical_139.is_critical | 是否进入139临界慢化（≥2个征兆） |
+| critical_139.regime | 市场状态：stable/transitioning/critical_slowing |
+| cycle_7.has_7_cycle | 是否检测到7-day循环群特征（闭合度≥0.3） |
+
+**错误码：**
+
+| code | 说明 |
+|------|------|
+| 2001 | 数据不足（需要≥50根K线） |
+| 2006 | 三重奏分析失败（内部错误） |
+
 ---
 
 ## 3. 信号 API

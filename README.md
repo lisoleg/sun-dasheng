@@ -37,15 +37,26 @@
 
 ## 核心特性
 
-### v0.2.1 (TOMAS v2.0 升级 — 当前版本)
+### v0.3.0 (宇宙算法三重奏 — 当前版本)
 
-- **🔮 拓扑不变量库** — 鲁加斯数列（Lucas Numbers）与八卦常数（Bagua Constants）的形式化实现，为所有理论引擎提供拓扑约束验证
-- **🌊 相位连续性分析（PCS）** — 基于 LOB 深度熵的相位连续性评分系统（Phase Continuity Score），实现三档熔断机制：PCS≥0.7 正常交易 / 0.3-0.7 降权 / <0.3 熔断中止
-- **🧬 DNA 倍发生成验证** — 鲁兆 DNA 基因提取 + 斐波那契/鲁加斯自相似验证 + κ-Snap 外推推理，检测市场 DNA 倍数复制模式
-- **⚙️ 全引擎相位过滤** — 7 个理论引擎统一接入 `apply_phase_filter()` 通用相位过滤函数，信号融合层增加全局相位连续性门控
-- **📊 前端图表增强** — PhaseAnalysisPage 新增 PCS 历史走势线图 + PCS/价格双 Y 轴叠加图；DNADetectionPage 新增波浪结构可视化（面积图 + 菱形标记 + 虚线边界）
-- **🔧 工程修复** — 解决信号模块循环导入（提取 base.py）、SQLAlchemy `metadata` 保留字冲突、async_session_factory 命名一致性、Python 3.10 兼容性
-- **📄 Phase 3 规划** — 基于代币化 AGI 经济架构的多 Agent 协作交易机制规划文档
+- **🌌 宇宙算法三重奏（7-139-369）** — 基于《宇宙算法的三重奏》文章，实现信号层(369数字根过滤)、时间层(139-day周期聚类+斐波那契共振)、风控层(139窗口缩仓+σ硬止损)三层架构
+- **🔢 369振动法则** — 模9群数字根过滤剔除市场噪音，只交易符合触发(3)-共振(6)-归整(9)振动模态的信号，`apply_369_signal_filter()` 供所有理论引擎调用
+- **⚡ 139相变阈值** — Landau-Ising临界慢化征兆检测（方差↑ / 自相关↑ / 恢复速率↓），周期律引擎整合139-day周期聚类+斐波那契共振确认拐点
+- **🔒 139风控升级** — StopLossManager增加139窗口σ硬止损+临界慢化止损；PositionSizer增加139自动缩仓(is_critical→×0.5)+369模态仓位调整(noise→×0.25)
+- **7 循环群自指验证** — Z_7循环群闭合检测（FFT在1/7频率处功率），142857完美循环节验证
+- **🔮 拓扑不变量库** — 鲁加斯数列（Lucas Numbers）与八卦常数（Bagua Constants）的形式化实现，7/139/369纳入不变量全集
+- **🌊 相位连续性分析（PCS）** — LOB深度熵PCS评分+三档熔断+369双重过滤
+- **🧬 DNA 倍发生成验证** — κ-Snap外推推理，检测市场DNA倍数复制模式
+- **📊 `/cosmic-algorithm` API** — 三重奏综合分析端点，返回369振动+139相变+7闭合+交易含义+风控建议
+
+### v0.2.1 (TOMAS v2.0 升级)
+
+- **🔮 拓扑不变量库** — 鲁加斯数列与八卦常数的实现，拓扑约束验证
+- **🌊 相位连续性分析（PCS）** — 三档熔断机制
+- **🧬 DNA 倍发生成验证** — κ-Snap 外推推理
+- **⚙️ 全引擎相位过滤** — `apply_phase_filter()` 通用函数
+- **📊 前端图表增强** — PCS 历史走势 + 波浪可视化
+- **🔧 工程修复** — 循环导入、SQLAlchemy保留字、async_session等
 
 ### v0.2.0 (Phase 2)
 
@@ -336,10 +347,11 @@ npm run dev
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| GET | `/api/market/bars` | 获取 K 线（OHLCV）数据 |
-| GET | `/api/market/symbols` | 列出可用交易标的 |
-| GET | `/api/market/phase-analysis` | 相位连续性分析（TOMAS v2.0 新增） |
-| GET | `/api/market/dna-detection` | DNA 倍发生成验证（TOMAS v2.0 新增） |
+| GET | `/api/v1/market/bars` | 获取 K 线（OHLCV）数据 |
+| GET | `/api/v1/market/symbols` | 列出可用交易标的 |
+| GET | `/api/v1/market/phase-analysis` | 相位连续性分析（PCS + 流动性熔断） |
+| GET | `/api/v1/market/dna-detection` | DNA 倍发生成验证（κ-Snap 推理） |
+| GET | `/api/v1/market/cosmic-algorithm` | 宇宙算法三重奏（7-139-369 综合分析） |
 
 #### 信号
 
@@ -692,6 +704,7 @@ sequenceDiagram
 | [docs/PAPER.md](docs/PAPER.md) | Phase 1 学术论文 — 鲁兆理论 + TOMAS-AGI 融合架构 |
 | [docs/PAPER-phase2.md](docs/PAPER-phase2.md) | Phase 2 技术论文 — 事件驱动回测引擎 + 多理论信号融合 |
 | [docs/PAPER-tomas-v2.md](docs/PAPER-tomas-v2.md) | TOMAS v2.0 技术论文 — 拓扑不变量 + 相位连续性 + DNA倍发生成验证 |
+| [docs/PAPER-cosmic-algorithm.md](docs/PAPER-cosmic-algorithm.md) | 宇宙算法三重奏论文 — 7-139-369信号/时间/风控三层架构 |
 | [docs/IMPLEMENTATION_WHITEPAPER.md](docs/IMPLEMENTATION_WHITEPAPER.md) | 系统实现白皮书 — 全栈工程实现详解 |
 | [docs/PHASE3_PLANNING.md](docs/PHASE3_PLANNING.md) | Phase 3 规划 — 多Agent协作交易机制 |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Phase 1 系统架构设计 |

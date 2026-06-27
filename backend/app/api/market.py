@@ -10,6 +10,7 @@ from loguru import logger
 from app.config import settings
 from app.services.market_data.tdx_provider import TdxProvider
 from app.services.market_data.binance_provider import BinanceProvider
+from app.core.cosmic_algorithm import cosmic_algorithm_trio
 
 router = APIRouter()
 
@@ -297,4 +298,90 @@ async def get_dna_detection(
             "code": 2005,
             "data": None,
             "message": f"DNA检测失败: {str(e)}",
+        }
+
+
+@router.get("/cosmic-algorithm")
+async def get_cosmic_algorithm(
+    symbol: str = Query("BTCUSDT", description="标的代码"),
+    timeframe: str = Query("1d", description="时间周期"),
+    limit: int = Query(200, ge=50, le=1000, description="K线数量"),
+) -> Dict[str, Any]:
+    """
+    宇宙算法三重奏综合分析（7-139-369）
+
+    返回：
+    - trio_score: 综合评分 [0, 1]
+    - vibration_369: 369振动模态检测结果
+    - critical_139: 139相变阈值检测结果
+    - cycle_7: 7循环群自指验证结果
+    - trio_label: 综合标签 (strong/moderate/weak)
+    - trading_implication: 交易含义建议
+    - risk_control: 风控建议
+    """
+    try:
+        # 1. 获取K线数据
+        if symbol.endswith("USDT") or symbol.endswith("BUSD"):
+            provider = await _get_binance_provider()
+        else:
+            provider = await _get_tdx_provider()
+
+        bars_data = await provider.get_bars(symbol, timeframe, limit)
+
+        if not bars_data or len(bars_data) < 50:
+            return {
+                "code": 2001,
+                "data": None,
+                "message": f"数据不足（需要≥50根K线）: {symbol}",
+            }
+
+        # 2. 转换为 numpy 数组
+        import numpy as np
+        closes = np.array([float(bar.close) for bar in bars_data])
+        volumes = np.array([float(bar.volume) for bar in bars_data])
+
+        # 3. 宇宙算法三重奏分析
+        trio_result = cosmic_algorithm_trio(closes, volumes)
+
+        # 4. 格式化响应
+        return {
+            "code": 0,
+            "data": {
+                "symbol": symbol,
+                "timeframe": timeframe,
+                "trio_score": round(trio_result["trio_score"], 4),
+                "trio_label": trio_result["trio_label"],
+                "trading_implication": trio_result["trading_implication"],
+                "risk_control": trio_result["risk_control"],
+                "vibration_369": {
+                    "vibration_score": round(trio_result["vibration_369"]["vibration_score"], 4),
+                    "trigger_freq": round(trio_result["vibration_369"]["trigger_freq"], 4),
+                    "resonance_freq": round(trio_result["vibration_369"]["resonance_freq"], 4),
+                    "closure_freq": round(trio_result["vibration_369"]["closure_freq"], 4),
+                    "mode_label": trio_result["vibration_369"]["mode_label"],
+                },
+                "critical_139": {
+                    "is_critical": trio_result["critical_139"]["is_critical"],
+                    "variance_ratio": round(trio_result["critical_139"]["variance_ratio"], 4),
+                    "autocorrelation": round(trio_result["critical_139"]["autocorrelation"], 4),
+                    "recovery_rate": round(trio_result["critical_139"]["recovery_rate"], 4),
+                    "critical_score": trio_result["critical_139"]["critical_score"],
+                    "regime": trio_result["critical_139"]["regime"],
+                },
+                "cycle_7": {
+                    "has_7_cycle": trio_result["cycle_7"]["has_7_cycle"],
+                    "closure_score": round(trio_result["cycle_7"]["closure_score"], 4),
+                    "dominant_period": trio_result["cycle_7"]["dominant_period"],
+                    "fft_power_at_7": round(trio_result["cycle_7"]["fft_power_at_7"], 6),
+                },
+            },
+            "message": "ok",
+        }
+
+    except Exception as e:
+        logger.error(f"API /cosmic-algorithm error: {e}")
+        return {
+            "code": 2006,
+            "data": None,
+            "message": f"宇宙算法三重奏分析失败: {str(e)}",
         }

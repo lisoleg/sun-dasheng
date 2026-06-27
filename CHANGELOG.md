@@ -6,6 +6,23 @@
 
 ---
 
+## [0.3.0] — 2026-06-27
+
+### 新增
+- 宇宙算法三重奏核心库（`cosmic_algorithm.py`）：digital_root数字根计算、vibration_mode_369振动模态检测、apply_369_signal_filter信号层过滤、detect_139_critical_transition相变阈值检测、cycle_7_closure_verification循环群自指验证、cosmic_algorithm_trio三重奏综合分析
+- `/api/v1/market/cosmic-algorithm` API端点：返回369振动+139相变+7闭合+交易含义+风控建议的综合分析结果
+- StopLossManager：139窗口σ硬止损（check_139_volatility_stop）+ 临界慢化硬止损（check_139_critical_stop）
+- PositionSizer：139自动缩仓（calculate_139_adjusted_size）+ 369模态仓位调整（calculate_369_adjusted_size）
+- 宇宙算法三重奏论文（`docs/PAPER-cosmic-algorithm.md`）
+
+### 修改
+- CycleLawEngine：整合139-day周期聚类+斐波那契共振确认拐点+369双重过滤（PCS+振动模态）
+- topo_invariants不变量全集纳入7/139/369宇宙算法常数
+- theory/__init__.py：修复 Any 类型未导入的 NameError
+- API路径前缀统一为 `/api/v1`
+
+---
+
 ## [0.2.1] — 2026-06-23
 
 ### 新增

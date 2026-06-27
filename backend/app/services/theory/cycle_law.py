@@ -12,7 +12,11 @@ from typing import Any, Dict, List, Tuple
 from loguru import logger
 
 from app.services.theory.base import TheoryEngine, TheoryResult
-from app.core.topo_invariants import apply_phase_filter
+from app.core.topo_invariants import apply_phase_filter, fibonacci_numbers
+from app.core.cosmic_algorithm import (
+    detect_139_critical_transition,
+    apply_369_signal_filter,
+)
 
 # 最小周期长度（K线数）
 MIN_CYCLE_LENGTH = 5
@@ -76,6 +80,22 @@ class CycleLawEngine(TheoryEngine):
             hints, confidence, bars, log_prefix=self.name
         )
 
+        # [宇宙算法] 139相变检测
+        import numpy as np
+        closes = np.array([float(bar.get("close", 0)) for bar in bars])
+        critical_139 = detect_139_critical_transition(closes)
+        if critical_139["is_critical"]:
+            # 临界慢化 → 旧周期即将失效，置信度额外降低50%
+            confidence *= 0.5
+            for hint in hints:
+                if isinstance(hint, dict):
+                    hint["confidence"] = hint.get("confidence", 0) * 0.5
+
+        # [宇宙算法] 369振动模态过滤（双重过滤）
+        hints, confidence, vibration_score, mode_details = apply_369_signal_filter(
+            hints, confidence, bars, log_prefix=self.name
+        )
+
         return TheoryResult(
             theory_name=self.name,
             timestamp=datetime.now(timezone.utc).isoformat(),
@@ -85,6 +105,8 @@ class CycleLawEngine(TheoryEngine):
                 "next_turn": next_turn,
                 "phase_continuity_score": pcs,
                 "is_phase_singularity": is_sing,
+                "critical_139": critical_139,
+                "vibration_369": mode_details,
             },
             hints=hints,
             confidence=confidence,
@@ -307,7 +329,11 @@ class CycleLawEngine(TheoryEngine):
         cycle_lengths: List[int],
         next_turn: Dict[str, Any],
     ) -> float:
-        """计算整体置信度"""
+        """计算整体置信度
+
+        包含斐波那契共振加权：如果周期长度接近斐波那契数（容差±20%），
+        该共振确认了拐点，置信度获得额外加分。
+        """
         if not cycle_lengths:
             return 0.0
 
@@ -333,5 +359,15 @@ class CycleLawEngine(TheoryEngine):
         else:
             distance_score = 0.0
 
-        confidence = stability * 0.4 + count_score * 0.3 + distance_score * 0.3
+        # [宇宙算法] 斐波那契共振确认
+        fib_nums = fibonacci_numbers(20)
+        fibonacci_resonance_count = 0
+        for length in cycle_lengths:
+            for fib in fib_nums[2:]:  # 跳过 F(0)=0 和 F(1)=1
+                if abs(length - fib) / fib < 0.2:  # 20% 容差
+                    fibonacci_resonance_count += 1
+                    break
+        fibonacci_resonance_score = fibonacci_resonance_count / len(cycle_lengths) if cycle_lengths else 0
+
+        confidence = stability * 0.4 + count_score * 0.3 + distance_score * 0.3 + fibonacci_resonance_score * 0.2
         return round(min(confidence, 1.0), 4)

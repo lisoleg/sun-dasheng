@@ -1,5 +1,7 @@
 """鲁兆理论引擎包 - 导出七大理论引擎"""
 
+from typing import Any
+
 from app.services.theory.taiji import TaijiEngine
 from app.services.theory.spiral import SpiralEngine
 from app.services.theory.elliott_wave import ElliottWaveEngine

@@ -10,11 +10,16 @@
 单笔最大仓位比例默认10%（RISK_MAX_POSITION_PCT）
 """
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
+import numpy as np
 from loguru import logger
 
 from app.config import settings
+from app.core.cosmic_algorithm import (
+    detect_139_critical_transition,
+    apply_369_signal_filter,
+)
 
 
 class PositionSizer:
@@ -194,3 +199,155 @@ class PositionSizer:
 
         ratio = reward / risk
         return round(ratio, 2)
+
+    def calculate_139_adjusted_size(
+        self,
+        capital: float,
+        risk_pct: float,
+        entry_price: float,
+        stop_price: float,
+        bars: List[Dict[str, Any]],
+    ) -> float:
+        """139窗口临界慢化自适应缩仓
+
+        调用宇宙算法的 detect_139_critical_transition() 检测临界慢化征兆，
+        根据检测结果动态缩减仓位大小：
+
+        - is_critical=True（临界慢化确认）：仓位减半（size × 0.5）
+        - regime="transitioning"（1个征兆）：仓位缩减至75%（size × 0.75）
+        - regime="stable"（稳定）：正常仓位（size × 1.0）
+
+        Args:
+            capital: 总资金
+            risk_pct: 风险比例（如0.02表示2%）
+            entry_price: 入场价格
+            stop_price: 止损价格
+            bars: 近期K线数据列表（每条需包含close/high/low等字段）
+
+        Returns:
+            float: 调整后的仓位大小（交易数量）
+        """
+        # 先用基础公式计算标准仓位
+        base_size: float = self.calculate_size(capital, risk_pct, entry_price, stop_price)
+
+        if base_size <= 0.0:
+            return 0.0
+
+        # 数据不足时直接返回基础仓位
+        if len(bars) < 139:
+            logger.warning(
+                f"PositionSizer: 139缩仓 - K线数据不足 "
+                f"(len={len(bars)} < 139), 使用正常仓位"
+            )
+            return base_size
+
+        # 调用宇宙算法检测139窗口临界慢化
+        result: Dict[str, Any] = detect_139_critical_transition(bars)
+        is_critical: bool = result.get("is_critical", False)
+        regime: str = result.get("regime", "stable")
+        critical_score: float = float(result.get("critical_score", 0.0))
+
+        # 根据检测结果调整仓位
+        adjusted_size: float = base_size
+
+        if is_critical:
+            # 临界慢化确认：仓位减半
+            adjusted_size = base_size * 0.5
+            logger.warning(
+                f"PositionSizer: 139临界慢化缩仓 - "
+                f"is_critical=True, critical_score={critical_score:.2f}, "
+                f"仓位减半 {base_size:.8f} -> {adjusted_size:.8f}"
+            )
+        elif regime == "transitioning":
+            # 1个征兆（过渡态）：仓位缩减至75%
+            adjusted_size = base_size * 0.75
+            logger.info(
+                f"PositionSizer: 139过渡态缩仓 - "
+                f"regime=transitioning, "
+                f"仓位缩减至75% {base_size:.8f} -> {adjusted_size:.8f}"
+            )
+        else:
+            # 稳定态：正常仓位
+            logger.debug(
+                f"PositionSizer: 139稳定态 - regime=stable, 正常仓位 "
+                f"size={base_size:.8f}"
+            )
+
+        return round(adjusted_size, 8)
+
+    def calculate_369_adjusted_size(
+        self,
+        capital: float,
+        risk_pct: float,
+        entry_price: float,
+        stop_price: float,
+        bars: List[Dict[str, Any]],
+    ) -> float:
+        """369振动模态仓位调整
+
+        调用宇宙算法的 apply_369_signal_filter() 检测振动模态信号质量，
+        根据振动得分（vibration_score）动态调整仓位：
+
+        - vibration_score >= 0.6：振动信号强，正常仓位（size × 1.0）
+        - 0.3 <= vibration_score < 0.6：振动信号中等，仓位缩减至75%（size × 0.75）
+        - vibration_score < 0.3：振动信号弱，仓位缩减至25%（接近清仓）（size × 0.25）
+
+        Args:
+            capital: 总资金
+            risk_pct: 风险比例（如0.02表示2%）
+            entry_price: 入场价格
+            stop_price: 止损价格
+            bars: 近期K线数据列表（每条需包含close/high/low等字段）
+
+        Returns:
+            float: 调整后的仓位大小（交易数量）
+        """
+        # 先用基础公式计算标准仓位
+        base_size: float = self.calculate_size(capital, risk_pct, entry_price, stop_price)
+
+        if base_size <= 0.0:
+            return 0.0
+
+        # 数据不足时直接返回基础仓位
+        if len(bars) < 10:
+            logger.warning(
+                f"PositionSizer: 369缩仓 - K线数据不足 "
+                f"(len={len(bars)} < 10), 使用正常仓位"
+            )
+            return base_size
+
+        # 调用宇宙算法检测369振动模态
+        result: Dict[str, Any] = apply_369_signal_filter(bars)
+        vibration_score: float = float(result.get("vibration_score", 0.0))
+        regime: str = result.get("regime", "unknown")
+
+        # 根据振动得分调整仓位
+        adjusted_size: float = base_size
+
+        if vibration_score >= 0.6:
+            # 振动信号强：正常仓位
+            logger.debug(
+                f"PositionSizer: 369振动正常 - "
+                f"vibration_score={vibration_score:.2f} >= 0.6, "
+                f"regime={regime}, 正常仓位 size={base_size:.8f}"
+            )
+        elif vibration_score >= 0.3:
+            # 振动信号中等：仓位缩减至75%
+            adjusted_size = base_size * 0.75
+            logger.info(
+                f"PositionSizer: 369振动中等缩仓 - "
+                f"vibration_score={vibration_score:.2f} ∈ [0.3, 0.6), "
+                f"regime={regime}, 仓位缩减至75% "
+                f"{base_size:.8f} -> {adjusted_size:.8f}"
+            )
+        else:
+            # 振动信号弱：仓位缩减至25%（接近清仓）
+            adjusted_size = base_size * 0.25
+            logger.warning(
+                f"PositionSizer: 369振动弱接近清仓 - "
+                f"vibration_score={vibration_score:.2f} < 0.3, "
+                f"regime={regime}, 仓位缩减至25% "
+                f"{base_size:.8f} -> {adjusted_size:.8f}"
+            )
+
+        return round(adjusted_size, 8)
