@@ -11,7 +11,7 @@
 - 仅置信度 > 0.3 的信号输出
 
 融合策略选择：
-- 支持 weighted（默认）/ and / or 三种策略
+- 支持 weighted（默认）/ and / or / risk_parity 四种策略
 - 通过 set_strategy() 或构造参数选择
 """
 
@@ -92,7 +92,7 @@ class SignalFusion:
 
         Args:
             engine_weights: 各理论引擎权重，默认等权
-            fusion_strategy: 融合策略 (weighted/and/or)
+            fusion_strategy: 融合策略 (weighted/and/or/risk_parity)
         """
         self._engine_weights = engine_weights or {}
         self._fusion_strategy_name = fusion_strategy
@@ -104,7 +104,7 @@ class SignalFusion:
         """设置融合策略
 
         Args:
-            strategy_name: 策略名称 (weighted/and/or)
+            strategy_name: 策略名称 (weighted/and/or/risk_parity)
             **kwargs: 传递给策略构造函数的参数
         """
         self._fusion_strategy_name = strategy_name

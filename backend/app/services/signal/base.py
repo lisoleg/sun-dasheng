@@ -1,5 +1,6 @@
 """信号模块基础类型定义"""
 
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Protocol

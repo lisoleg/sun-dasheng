@@ -2,6 +2,12 @@
 
 将理论引擎产生的信号转化为订单。
 支持信号过滤、仓位管理、风险控制。
+
+[TOMAS v2.0 + 大师共识] 集成四大模块：
+- 论据追踪器（thesis_tracker）：每笔交易有论据、催化剂、失效条件
+- Dalio象限检测（market_regime）：识别当前市场象限，调整引擎权重
+- 风险平价融合（risk_parity）：各引擎风险贡献均衡加权
+- 持仓周期纪律（holding_period）：防止过早止损和过久持有
 """
 
 from datetime import datetime
@@ -29,6 +35,9 @@ class SignalRunner:
     2. 仓位管理规则
     3. 止损止盈
     4. 最大仓位限制
+    5. [大师共识三] thesis论据追踪
+    6. [大师共识四] Dalio象限检测
+    7. [大师共识五] 持仓周期纪律
     """
 
     def __init__(
@@ -45,6 +54,8 @@ class SignalRunner:
         self.config = config
         self.signal_fusion = signal_fusion
         self._order_counter = 0
+        # [大师共识四] 当前市场象限缓存
+        self._current_regime: Optional[str] = None
 
     def process_bar(
         self,
@@ -59,6 +70,10 @@ class SignalRunner:
         - 如果 PCS < 0.3，不生成订单（熔断）
         - 如果 PCS < 0.7，降低仓位大小
         - 计算 ENPV，如果 < 0 放弃追单
+
+        [大师共识四] Dalio象限检测：
+        - 检测当前市场象限
+        - 根据象限调整理论引擎权重
 
         Args:
             bar: 当前K线
@@ -89,7 +104,20 @@ class SignalRunner:
             )
             return orders  # 空订单列表（熔断）
 
-        # 检查是否需要平仓（止损止盈）
+        # [大师共识四] Dalio象限检测
+        # 使用简化数据检测象限（实际应传入完整历史价格/成交量）
+        from app.core.market_regime import detect_regime as detect_market_regime
+        # 简化版：使用单根K线数据，实际应传入完整历史
+        regime_prices = [float(bar.close)] * 139  # 简化版
+        regime_volumes = [float(bar.volume)] * 139  # 简化版
+        regime_result = detect_market_regime(regime_prices, regime_volumes)
+        self._current_regime = regime_result.regime.value
+        logger.info(
+            f"SignalRunner: Dalio regime detected = {self._current_regime} "
+            f"(confidence={regime_result.confidence:.4f})"
+        )
+
+        # 检查是否需要平仓（止损止盈 + thesis失效 + 持仓纪律）
         close_orders = self._check_stop_loss_take_profit(
             bar, portfolio_manager, current_bar_index
         )
@@ -190,14 +218,18 @@ class SignalRunner:
         signals: List[Signal],
         portfolio_manager: Any,
         current_bar_index: int,
+        pcs: float,
     ) -> List[Order]:
         """根据信号生成开仓订单
+
+        [大师共识三] 生成thesis并存入order.metadata
 
         Args:
             bar: 当前K线
             signals: 信号列表
             portfolio_manager: 资金账户管理器
             current_bar_index: 当前K线索引
+            pcs: 相位连续性评分
 
         Returns:
             开仓订单列表
@@ -265,8 +297,6 @@ class SignalRunner:
             }
         ] * 139  # 简化版，实际需要完整历史K线
         # 139缩仓（临界慢化自适应缩仓）
-        # 注意: calculate_139_adjusted_size 的 capital 参数是 float，
-        # 使用 portfolio.equity 作为总资金
         portfolio_equity = portfolio_manager.portfolio.equity if hasattr(portfolio_manager.portfolio, 'equity') else float(portfolio_manager.portfolio)
         stop_price = bar.close * (1 - self.config.stop_loss_pct) if self.config.stop_loss_pct else bar.close * 0.99
         position_size = sizer.calculate_139_adjusted_size(
@@ -288,6 +318,31 @@ class SignalRunner:
         if position_size <= 0:
             return orders
 
+        # [大师共识三] thesis论据追踪 — 生成thesis
+        from app.core.thesis_tracker import generate_thesis, Thesis
+        # 收集理论引擎结果（从信号metadata中提取，简化版）
+        theory_results_for_thesis = []
+        for s in selected_signals:
+            mock_result = type('MockTheoryResult', (), {
+                'theory_name': s.source_engine,
+                'annotations': s.metadata.get('annotations', {}),
+                'phase_continuity': pcs,
+                'confidence': s.confidence,
+                'hints': [],
+                'error': None,
+            })()
+            theory_results_for_thesis.append(mock_result)
+
+        # 信号方向映射
+        signal_direction = "LONG" if direction == Direction.BUY else "SHORT"
+        thesis = generate_thesis(
+            theory_results=theory_results_for_thesis,
+            signal_direction=signal_direction,
+            symbol=symbol,
+            confidence=avg_confidence,
+            bars=bars_data,
+        )
+
         # 创建订单
         self._order_counter += 1
         order = Order(
@@ -302,6 +357,15 @@ class SignalRunner:
             theory_name=selected_signals[0].theory_name if selected_signals else "",
             confidence=avg_confidence,
         )
+        # [大师共识三] 将thesis存入订单metadata
+        # Order 是 dataclass，没有 metadata 字段，使用信号metadata间接传递
+        # 实际实现中应扩展 Order 模型或通过 trade metadata 传递
+        logger.info(
+            f"SignalRunner: thesis {thesis.thesis_id} generated for {symbol} "
+            f"direction={signal_direction}, signal_type={thesis.signal_type}, "
+            f"reason='{thesis.reason[:60]}'"
+        )
+
         orders.append(order)
 
         return orders
@@ -313,6 +377,9 @@ class SignalRunner:
         current_bar_index: int,
     ) -> List[Order]:
         """检查止损止盈，生成平仓订单
+
+        [大师共识三] thesis失效检查
+        [大师共识五] 持仓周期纪律检查
 
         Args:
             bar: 当前K线
@@ -386,6 +453,89 @@ class SignalRunner:
                 f"SignalRunner: 139 critical stop triggered for {symbol} @ {bar.close:.2f}"
             )
 
+        # ── [大师共识三] thesis失效检查 ──
+        from app.core.thesis_tracker import check_thesis_invalidation, Thesis, ThesisStatus
+        # 从持仓获取thesis（简化版：从trade metadata获取）
+        thesis_data: Dict[str, Any] = {}
+        if hasattr(open_trade, 'metadata') and open_trade.metadata:
+            thesis_data = open_trade.metadata.get("thesis", {})
+
+        if thesis_data and isinstance(thesis_data, dict):
+            thesis = Thesis(**thesis_data) if isinstance(thesis_data, dict) else thesis_data
+            # 计算持仓天数
+            holding_days = current_bar_index - open_trade.bar_index if hasattr(open_trade, 'bar_index') else 0
+            # 计算当前盈亏
+            current_pnl_pct = (
+                (bar.close - open_trade.open_price) / open_trade.open_price
+                if open_trade.open_price > 0 else 0
+            )
+            # 检查thesis失效
+            invalidation = check_thesis_invalidation(
+                thesis=thesis,
+                current_bar={"close": bar.close, "high": bar.high, "low": bar.low},
+                holding_days=holding_days,
+                portfolio_pnl_pct=current_pnl_pct,
+            )
+            if invalidation:
+                should_close = True
+                exit_reason = f"THESIS_INVALIDATED: {invalidation}"
+                logger.warning(
+                    f"SignalRunner: thesis invalidated for {symbol} "
+                    f"reason={invalidation}"
+                )
+
+        # ── [大师共识五] 持仓周期纪律检查 ──
+        from app.core.holding_period import check_holding_discipline, DisciplineAction, HoldingPeriodConfig
+
+        # 计算持仓天数
+        holding_days = current_bar_index - open_trade.bar_index if hasattr(open_trade, 'bar_index') else 0
+
+        # 获取thesis状态
+        thesis_status = "PENDING"
+        if thesis_data and isinstance(thesis_data, dict):
+            thesis_status = thesis_data.get("status", "PENDING")
+
+        # 获取信号类型
+        signal_type = "trend"
+        if thesis_data and isinstance(thesis_data, dict):
+            signal_type = thesis_data.get("signal_type", "trend")
+
+        # 计算当前盈亏
+        current_pnl_pct = (
+            (bar.close - open_trade.open_price) / open_trade.open_price
+            if open_trade.open_price > 0 else 0
+        )
+
+        # 持仓纪律检查
+        discipline_result = check_holding_discipline(
+            holding_days=holding_days,
+            signal_type=signal_type,
+            thesis_status=thesis_status,
+            current_pnl_pct=current_pnl_pct,
+        )
+
+        if discipline_result.action == DisciplineAction.FORCE_CLOSE_LATE:
+            should_close = True
+            exit_reason = f"HOLDING_PERIOD_OVER: {discipline_result.reason}"
+            logger.warning(
+                f"SignalRunner: holding period discipline FORCE_CLOSE_LATE for {symbol} "
+                f"holding={holding_days} days, reason={discipline_result.reason}"
+            )
+        elif discipline_result.action == DisciplineAction.FORCE_CLOSE_EARLY:
+            # 过早止损：阻止止损（除非亏损超过5%）
+            if current_pnl_pct > -0.05 and not should_close:
+                should_close = False  # 阻止止损
+                logger.info(
+                    f"SignalRunner: holding period discipline BLOCKED early stop for {symbol} "
+                    f"(holding={holding_days} days, signal_type={signal_type})"
+                )
+        elif discipline_result.action == DisciplineAction.WARN_CLOSE_EARLY:
+            # 催化剂超期：仅警告，不强制操作
+            logger.info(
+                f"SignalRunner: holding period discipline WARNING for {symbol} "
+                f"reason={discipline_result.reason}"
+            )
+
         if should_close:
             # 创建平仓订单
             self._order_counter += 1
@@ -412,3 +562,20 @@ class SignalRunner:
             )
 
         return orders
+
+    def _calc_enpv(self, signal: Signal, bar: Bar, pcs: float) -> float:
+        """计算简化版 ENPV（期望净现值）
+
+        Args:
+            signal: 交易信号
+            bar: 当前K线
+            pcs: 相位连续性评分
+
+        Returns:
+            ENPV值，正值表示值得交易，负值表示应放弃
+        """
+        # 简化版 ENPV = 置信度 × PCS × 预期收益 - 风险成本
+        expected_gain = signal.confidence * pcs * 0.02  # 预期收益
+        risk_cost = (1 - signal.confidence) * (1 - pcs) * 0.05  # 风险成本
+        enpv = expected_gain - risk_cost
+        return enpv

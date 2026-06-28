@@ -385,3 +385,71 @@ async def get_cosmic_algorithm(
             "data": None,
             "message": f"宇宙算法三重奏分析失败: {str(e)}",
         }
+
+
+# ─────────────────────────────────────────────
+# [大师共识四] Dalio经济象限检测
+# ─────────────────────────────────────────────
+
+@router.get("/regime")
+async def get_market_regime(
+    symbol: str = Query("000001", description="股票代码"),
+    timeframe: str = Query("1d", description="时间周期"),
+    limit: int = Query(200, description="数据量"),
+) -> Dict[str, Any]:
+    """
+    Dalio经济象限检测（大师共识四）
+
+    返回：
+    - regime: 当前象限 (expansion/reflation/stagflation/deflation)
+    - confidence: 象限判断置信度
+    - growth_signal: 增长信号强度
+    - inflation_signal: 通胀信号强度
+    - description: 象限描述
+    - asset_weights: 推荐资产权重
+    """
+    try:
+        # 1. 获取K线数据
+        if symbol.endswith("USDT") or symbol.endswith("BUSD"):
+            provider = await _get_binance_provider()
+        else:
+            provider = await _get_tdx_provider()
+
+        bars_data = await provider.get_bars(symbol, timeframe, limit)
+
+        if not bars_data or len(bars_data) < 139:
+            return {
+                "code": 2001,
+                "data": None,
+                "message": f"数据不足（需要≥139根K线）: {symbol}",
+            }
+
+        # 2. 提取价格和成交量
+        prices = [float(bar.close) for bar in bars_data]
+        volumes = [float(bar.volume) if hasattr(bar, "volume") else 0.0 for bar in bars_data]
+
+        # 3. Dalio象限检测
+        from app.core.market_regime import detect_regime, get_regime_theory_weights
+        result = detect_regime(prices, volumes)
+
+        # 4. 获取理论引擎权重调整
+        theory_weights = get_regime_theory_weights(result.regime)
+
+        return {
+            "code": 0,
+            "data": {
+                "symbol": symbol,
+                "timeframe": timeframe,
+                **result.to_dict(),
+                "theory_weights_adjustment": theory_weights,
+            },
+            "message": "ok",
+        }
+
+    except Exception as e:
+        logger.error(f"API /regime error: {e}")
+        return {
+            "code": 2007,
+            "data": None,
+            "message": f"象限检测失败: {str(e)}",
+        }
