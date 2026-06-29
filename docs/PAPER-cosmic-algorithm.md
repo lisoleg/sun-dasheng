@@ -1,6 +1,6 @@
 # 宇宙算法三重奏：7-139-369 在量化交易中的三层架构实现
 
-> **版本**: v0.3.0 | **日期**: 2026-06-27 | **项目**: 孙大圣量化交易系统
+> **版本**: v0.4.0 | **日期**: 2026-06-27 | **项目**: 孙大圣量化交易系统
 
 ---
 
@@ -15,6 +15,8 @@
 三重奏的核心常数——7（结构自指）、139（临界演化）、369（振动法则）——分别对应了循环群Z_7的完美闭合、Landau-Ising相变模型的临界阈值、以及模9群的动力学投影。本文详细阐述了这三个常数的数学基础及其在金融市场的工程实现。
 
 **v0.3.0 更新**：本文档新增前端 CosmicAlgorithmPage 实时展示、6个理论引擎369振动模态过滤推广、回测引擎139缩仓+σ硬止损集成。
+
+**v0.4.0 更新**：新增TDA拓扑预警与Dalio象限融合——compute_betti_numbers()、compute_persistence_diagram()、detect_regime_with_tda()，前端RegimePage可视化，API /regime 端点增强。
 
 ---
 
@@ -405,6 +407,165 @@ position_size = sizer.calculate_369_adjusted_size(
 
 ---
 
+## 10. TDA拓扑预警与Dalio象限融合
+
+> **v0.4.0 新增**：基于拓扑数据分析(Topological Data Analysis)的持续同调(Persistent Homology)和Betti数检测，与Dalio象限模型深度融合，实现金融危机的拓扑预警。
+
+### 10.1 TDA理论基础
+
+拓扑数据分析(TDA)是一门利用代数拓扑工具分析数据形状的数学方法。其核心概念：
+
+**持续同调(Persistent Homology)**：随着滤波参数ε从0逐步增大，数据点之间的"连通阈值"逐步放宽。在此过程中，拓扑特征（连通分量、环形空洞等）会经历"出生"和"死亡"。记录每个特征的出生ε和死亡ε，就得到了**持久图(Persistence Diagram)**。
+
+- **持久条(Persistence Bar)**长度 = 死亡ε − 出生ε
+- 长寿命特征 → 真实结构（不受噪声干扰）
+- 短寿命特征 → 噪声（很快消失）
+
+**Betti数**是拓扑不变量，描述数据形状的基本特征：
+
+| Betti数 | 含义 | 金融映射 |
+|---------|------|---------|
+| β₀ | 连通分量数 | 市场共识度：β₀=1→整体连通，β₀↑→碎片化 |
+| β₁ | 环形空洞数 | 循环结构：β₁出现→新振荡模式，β₁消失→模式瓦解 |
+| β₂ | 二维空洞数 | 更高阶结构（金融数据通常不涉及） |
+
+### 10.2 Betti数与金融危机预警
+
+基于《拓扑数据分析是如何提前一年预警金融危机的》一文的核心洞察：
+
+1. **β₀增加 → 市场碎片化 → 危机前兆**
+   - 正常市场：价格聚集在有限范围内 → β₀≈1
+   - 危机前：价格分散到多个不连通区域 → β₀>2
+   - 市场共识瓦解 → 不同投资者群体对价格形成分裂预期
+
+2. **β₁出现/消失 → 循环结构变化 → 象限过渡信号**
+   - β₁从0变为正值：新的循环振荡模式出现 → 市场进入新的象限
+   - β₁消失：旧循环模式瓦解 → 当前象限即将结束
+   - 这与Dalio象限切换完美对应
+
+3. **持久条长度缩短 → 结构脆弱 → 相变即将发生**
+   - 正常市场：拓扑特征寿命长 → persistence_score高 → 结构稳健
+   - 危机前：持久条普遍缩短 → persistence_score低 → 结构脆弱
+   - TDA能比传统统计方法提前检测到regime transition
+
+**TDA与139相变检测的关系**：139临界慢化检测本质上就是拓扑检测的简化版——方差比增加、自相关时间延长、恢复速率下降，这些正是β₀增加和持久条缩短的统计表现。TDA提供了更本质的拓扑视角。
+
+### 10.3 compute_betti_numbers()和compute_persistence_diagram()的实现
+
+#### β₀计算（连通分量数）
+
+```python
+# 算法：Union-Find聚类
+# 1. 将价格归一化
+# 2. 设置连通阈值 ε = price_range × 5%
+# 3. 排序价格，相邻差距<ε → Union-Find合并
+# 4. 统计连通分量数 = β₀
+```
+
+关键设计：
+- ε比例默认5%：太低→噪声过多，太高→所有价格合并为一簇
+- 使用Union-Find算法（路径压缩），O(n log n)复杂度
+- β₀>2时触发碎片化预警
+
+#### β₁计算（环形结构数）
+
+```python
+# 算法：局部极值循环检测
+# 1. 找局部极值点（峰和谷，窗口=5）
+# 2. 检测峰谷交替形成的"环形振荡"
+# 3. 振幅>ε的振荡算有效环形
+# 4. β₁ = 有效环形数（上限5个）
+```
+
+关键设计：
+- 不是严格的代数拓扑β₁（需要Vietoris-Rips复形），而是实用简化版
+- 检测价格序列中"峰-谷-峰"形成的振荡循环
+- β₁≥2时触发环形过渡预警
+
+#### persistence_score计算（拓扑持久度）
+
+```python
+# 算法：ε扫描 + birth-death记录
+# 1. ε从0到price_range*0.5，分20步扫描
+# 2. 每步记录β₀值 → 连通分量合并事件
+# 3. 每个0维特征在ε=0出生，在合并点"死亡"
+# 4. persistence = death - birth
+# 5. persistence_score = 归一化平均持久度
+```
+
+关键设计：
+- persistence_score ∈ [0, 1]
+- ≥0.5 → 结构稳健（正常）
+- 0.3-0.5 → 中等（观察）
+- <0.3 → 临界过渡（预警）
+
+### 10.4 detect_regime_with_tda()融合逻辑
+
+融合策略：**Dalio象限看宏观位置，TDA看微观拓扑结构**
+
+```
+detect_regime_with_tda(prices, volumes):
+  1. detect_regime() → Dalio象限 + 置信度
+  2. compute_betti_numbers() → β₀, β₁
+  3. compute_persistence_diagram() → persistence_score
+  4. TDA预警判定（优先级从高到低）：
+     - persistence < 0.3 → critical_transition（最严重）
+     - β₀ > 2 → fragmenting
+     - β₁ ≥ 2 → loop_transition
+     - β₀=2 & persistence<0.5 → 轻度fragmenting
+     - 否则 → normal
+  5. TDA修正Dalio置信度：
+     - critical_transition → ×0.5
+     - fragmenting → ×0.7
+     - loop_transition → ×0.85
+     - normal → 不修正
+  6. 输出增强版RegimeResult
+```
+
+**设计哲学**：TDA不是替代Dalio象限，而是提供"预警层"。Dalio象限告诉你"你在哪里"，TDA告诉你"你可能要离开这里"。两者互补：
+
+| 情景 | Dalio象限 | TDA预警 | 综合建议 |
+|------|----------|---------|---------|
+| 正常扩张 | EXPANSION | normal | 正常配置：股票40%+商品25% |
+| 碎片化扩张 | EXPANSION | fragmenting | 象限不可靠→分散持仓+降仓位 |
+| 环形过渡 | EXPANSION | loop_transition | 象限即将切换→动态调整 |
+| 临界相变 | EXPANSION | critical_transition | 相变即将发生→防御+硬止损 |
+
+### 10.5 前端RegimePage可视化设计
+
+前端新增 `RegimePage` 页面（`/regime`），展示Dalio象限+TDA拓扑预警的综合分析结果。
+
+**页面布局**：
+1. **标题栏**：Grid2X2 icon + "经济象限检测" + Chip "Dalio+TDA"
+2. **搜索栏**：TextField 股票代码 + TextField 时间周期 + Button 检测
+3. **Dalio 2x2象限矩阵**（左侧5列）：SVG绘制四象限图
+   - 左上: REFLATION(增长↑通胀↓) - 蓝色
+   - 右上: EXPANSION(增长↑通胀↑) - 绿色
+   - 左下: DEFLATION(增长↓通胀↓) - 紫色
+   - 右下: STAGFLATION(增长↓通胀↑) - 红色
+   - 当前象限高亮+脉冲动画
+   - 信号指示点（增长/通胀的当前位置）
+4. **TDA拓扑预警卡片**（右侧7列）：
+   - β₀连通分量数 + 变化趋势小图
+   - β₁环形结构数 + 变化趋势小图
+   - 拓扑持久度评分(persistence_score) CircularProgress表盘
+   - TDA预警标签Chip
+   - TDA置信度/Dalio置信度进度条
+5. **增长/通胀信号仪表盘**：两个CircularProgress大表盘
+6. **推荐资产权重雷达图**：recharts RadarChart
+7. **理论引擎权重调整表**：每个引擎的权重系数和调整方向
+8. **象限历史模拟走势图**：ComposedChart增长/通胀时间序列
+9. **交易建议卡片**：Dalio建议+TDA预警建议+预警指标表
+
+**API调用**：`GET /api/v1/market/regime?symbol=XXX&timeframe=1d&limit=200`
+**降级策略**：API失败时自动mock数据
+
+**导航集成**：
+- `App.tsx`：添加 `import RegimePage` + `<Route path="/regime" .../>`
+- `Sidebar.tsx`：添加 `{ path: '/regime', label: '象限检测', icon: Grid2X2 }`
+
+---
+
 ## 9. 结论与展望
 
 宇宙算法三重奏（7-139-369）为孙大圣量化交易系统提供了一个基于数论和复杂系统理论的新型过滤框架。三个核心常数——7（结构自指）、139（临界演化）、369（振动法则）——从不同维度约束信号质量，形成了"只交易符合数学规律的市场行为"的核心理念。
@@ -414,6 +575,7 @@ position_size = sizer.calculate_369_adjusted_size(
 2. 将369振动模态应用于高频数据（分钟级），探索微观结构振动模式
 3. 7循环群检测扩展为多尺度周期检测（Z_7、Z_12、Z_60等）
 4. ~~将三重奏评分接入前端实时显示，增强用户决策体验~~ ✅ 已完成（CosmicAlgorithmPage）
+5. ~~TDA拓扑预警与Dalio象限融合，RegimePage前端展示~~ ✅ 已完成（v0.4.0）
 
 ---
 
@@ -428,3 +590,7 @@ position_size = sizer.calculate_369_adjusted_size(
 [4] TOMAS v2.0：基于广义代数理论（GAT）的太乙互搏公理体系.
 
 [5] 鲁兆：波浪理论、费氏数列、八卦历法.
+
+[6] 拓扑数据分析是如何提前一年预警金融危机的. 复合体理学微信公众号, 2026.
+
+[7] Edelsbrunner, H. & Harer, J. Computational Topology: An Introduction. AMS, 2010.

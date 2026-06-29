@@ -23,6 +23,7 @@ import {
   Activity,
   Dna,
   Orbit,
+  Grid2X2,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -44,6 +45,8 @@ const NAV_ITEMS = [
   { path: '/dna-detection', label: 'DNA检测', icon: Dna },
   // 宇宙算法三重奏
   { path: '/cosmic-algorithm', label: '宇宙算法', icon: Orbit },
+  // 经济象限检测（Dalio+TDA）
+  { path: '/regime', label: '象限检测', icon: Grid2X2 },
 ];
 
 const Sidebar: React.FC<SidebarProps> = ({ open }) => {

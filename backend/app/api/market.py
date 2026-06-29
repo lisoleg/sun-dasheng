@@ -388,7 +388,7 @@ async def get_cosmic_algorithm(
 
 
 # ─────────────────────────────────────────────
-# [大师共识四] Dalio经济象限检测
+# [大师共识四] Dalio经济象限检测 + TDA拓扑预警
 # ─────────────────────────────────────────────
 
 @router.get("/regime")
@@ -398,15 +398,21 @@ async def get_market_regime(
     limit: int = Query(200, description="数据量"),
 ) -> Dict[str, Any]:
     """
-    Dalio经济象限检测（大师共识四）
+    Dalio经济象限检测 + TDA拓扑预警（大师共识四）
 
     返回：
     - regime: 当前象限 (expansion/reflation/stagflation/deflation)
-    - confidence: 象限判断置信度
+    - confidence: 象限判断置信度（经TDA调整）
     - growth_signal: 增长信号强度
     - inflation_signal: 通胀信号强度
-    - description: 象限描述
+    - description: 象限描述（含TDA预警标签）
     - asset_weights: 推荐资产权重
+    - betti_0: 连通分量数（TDA拓扑指标）
+    - betti_1: 环形结构数（TDA拓扑指标）
+    - persistence_score: 拓扑持久度（TDA拓扑指标）
+    - tda_warning: TDA预警标签 (normal/fragmenting/loop_transition/critical_transition)
+    - tda_confidence: TDA预警置信度
+    - theory_weights_adjustment: 理论引擎权重调整
     """
     try:
         # 1. 获取K线数据
@@ -428,9 +434,9 @@ async def get_market_regime(
         prices = [float(bar.close) for bar in bars_data]
         volumes = [float(bar.volume) if hasattr(bar, "volume") else 0.0 for bar in bars_data]
 
-        # 3. Dalio象限检测
-        from app.core.market_regime import detect_regime, get_regime_theory_weights
-        result = detect_regime(prices, volumes)
+        # 3. Dalio象限检测 + TDA拓扑预警（增强版）
+        from app.core.market_regime import detect_regime_with_tda, get_regime_theory_weights
+        result = detect_regime_with_tda(prices, volumes)
 
         # 4. 获取理论引擎权重调整
         theory_weights = get_regime_theory_weights(result.regime)
